@@ -22,9 +22,16 @@ BootpayApi::setConfiguration(
 $token = BootpayApi::getAccessToken();
 // var_dump($token);
 
-if (!$token->error_code) {
+if (!isset($token->error_code)) {
+    $response = BootpayApi::cashReceiptCancelOnReceipt(
+        array(
+            'receipt_id' => '62e0f11f1fc192036b1b3c92',
+            'cancel_username' => '관리자',
+            'cancel_message' => '일반적인 취소'
+        )
+    );
     try {
-        $response = BootpayApi::cashCancelOnReceipt(
+        $response = BootpayApi::cashReceiptCancelOnReceipt(
             array(
                 'receipt_id' => '62e0f11f1fc192036b1b3c92',
                 'cancel_username' => '관리자',
@@ -33,6 +40,6 @@ if (!$token->error_code) {
         );
         var_dump($response);
     } catch (Exception $e) {
-        echo($e->getMessage());
+        print($e->getMessage());
     }
 }

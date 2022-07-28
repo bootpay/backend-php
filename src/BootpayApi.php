@@ -55,7 +55,7 @@ class BootpayApi
         $errno = curl_errno($channel);
         $errMsg = curl_error($channel);
         if ($errno) {
-            throw new Exception('error: ' . $errno . ', msg: ' . $errMsg);
+            throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
         }
         curl_close($channel);
         $json = json_decode(trim($response));
@@ -88,7 +88,7 @@ class BootpayApi
                 'private_key' => self::$privateKey
             )
         );
-        if (!$response->error_code) {
+        if (!isset($response->error_code)) {
             self::$token = $response->access_token;
         }
         return $response;
@@ -312,7 +312,7 @@ class BootpayApi
      * Comment by GOSOMI
      * @date: 2022-07-28
      */
-    public static function cashPublishOnReceipt($cashPublishParameters)
+    public static function cashReceiptPublishOnReceipt($cashPublishParameters)
     {
         return self::request(
             'POST',
@@ -326,12 +326,11 @@ class BootpayApi
      * Comment by GOSOMI
      * @date: 2022-07-28
      */
-    public static function cashCancelOnReceipt($cashCancelParameters)
+    public static function cashReceiptCancelOnReceipt($cashCancelParameters)
     {
         return self::request(
             'DELETE',
-            'request/receipt/cash/cancel/' . $cashCancelParameters['receipt_id'],
-            $cashCancelParameters
+            sprintf('request/receipt/cash/cancel/%s?%s', $cashCancelParameters['receipt_id'], http_build_query($cashCancelParameters))
         );
     }
 }

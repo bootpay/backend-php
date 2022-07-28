@@ -24,7 +24,7 @@ $token = BootpayApi::getAccessToken();
 
 if (!$token->error_code) {
     try {
-        $response = BootpayApi::cashPublishOnReceipt(
+        $response = BootpayApi::cashReceiptPublishOnReceipt(
             array(
                 'receipt_id' => '62e0f11f1fc192036b1b3c92',
                 'username' => '테스트',
