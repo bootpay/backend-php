@@ -306,4 +306,32 @@ class BootpayApi
             $shippingParameters
         );
     }
+
+    /**
+     * 결제건에 대한 현금영수증 발행
+     * Comment by GOSOMI
+     * @date: 2022-07-28
+     */
+    public static function cashPublishOnReceipt($cashPublishParameters)
+    {
+        return self::request(
+            'POST',
+            'request/receipt/cash/publish',
+            $cashPublishParameters
+        );
+    }
+
+    /**
+     * 결제건에 대한 현금영수증 취소
+     * Comment by GOSOMI
+     * @date: 2022-07-28
+     */
+    public static function cashCancelOnReceipt($cashCancelParameters)
+    {
+        return self::request(
+            'DELETE',
+            'request/receipt/cash/cancel/' . $cashCancelParameters['receipt_id'],
+            $cashCancelParameters
+        );
+    }
 }

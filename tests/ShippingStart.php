@@ -26,6 +26,12 @@ if (!$token->error_code) {
                     'phone' => '01000000000',
                     'zipcode' => '099382',
                     'address' => '서울특별시 종로구'
+                ),
+                'company' => array(
+                    'name' => '테스트가맹점',
+                    'zipcode' => '099328',
+                    'addr1' => '서울특별시 종로구',
+                    'addr2' => '종로빌딩 3층'
                 )
             )
         );
