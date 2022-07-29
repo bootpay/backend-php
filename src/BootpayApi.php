@@ -14,6 +14,8 @@ class BootpayApi
         'production' => 'https://api.bootpay.co.kr/v2'
     );
     private static $postMethods = array('POST', 'PUT');
+    private static $apiVersion = '4.2.0';
+    private static $sdkVersion = '2.0.1';
 
     private static function entrypoints($url)
     {
@@ -32,7 +34,10 @@ class BootpayApi
         return array_merge($headers, array(
             'Content-Type: application/json',
             'Accept: application/json',
-            'Authorization: ' . (strlen(self::$token) ? "Bearer " . self::$token : null)
+            'Authorization: ' . (strlen(self::$token) ? "Bearer " . self::$token : null),
+            'BOOTPAY-API-VERSION: ' . self::$apiVersion,
+            'BOOTPAY-SDK-VERSION: ' . self::$sdkVersion,
+            'BOOTPAY-SDK-TYPE: 303'
         ));
     }
 
