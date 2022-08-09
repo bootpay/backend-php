@@ -338,4 +338,31 @@ class BootpayApi
             sprintf('request/receipt/cash/cancel/%s?%s', $cashCancelParameters['receipt_id'], http_build_query($cashCancelParameters))
         );
     }
+
+    /**
+     * 현금영수증 별건 발행
+     * Comment by GOSOMI
+     * @date: 2022-08-09
+     */
+    public static function requestCashReceipt($requestCashReceiptParameters)
+    {
+        return self::request(
+            'POST',
+            'request/cash/receipt',
+            $requestCashReceiptParameters
+        );
+    }
+
+    /**
+     * 현금영수증 별건 발행 취소하기
+     * Comment by GOSOMI
+     * @date: 2022-08-09
+     */
+    public static function cancelCashReceipt($cancelCashReceiptParameters)
+    {
+        return self::request(
+            'DELETE',
+            sprintf("request/cash/receipt/%s?%s", $cancelCashReceiptParameters['receipt_id'], http_build_query($cancelCashReceiptParameters))
+        );
+    }
 }
