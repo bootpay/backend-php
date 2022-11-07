@@ -14,8 +14,8 @@ class BootpayApi
         'production' => 'https://api.bootpay.co.kr/v2'
     );
     private static $postMethods = array('POST', 'PUT');
-    private static $apiVersion = '4.2.0';
-    private static $sdkVersion = '2.0.1';
+    private static $apiVersion = '4.2.5';
+    private static $sdkVersion = '2.0.2';
 
     private static function entrypoints($url)
     {
@@ -365,4 +365,52 @@ class BootpayApi
             sprintf("request/cash/receipt/%s?%s", $cancelCashReceiptParameters['receipt_id'], http_build_query($cancelCashReceiptParameters))
         );
     }
+
+    /**
+     * 본인인증 REST API 요청
+     * Comment by GOSOMI
+     * @date: 2022-11-07
+     */
+    public static function requestAuthentication($authenticationRequestParameters)
+    {
+        return self::request(
+            'POST',
+            'request/authentication',
+            $authenticationRequestParameters
+        );
+    }
+
+    /**
+     * 본인인증 승인
+     * Comment by GOSOMI
+     * @date: 2022-11-07
+     */
+    public static function confirmAuthentication($receiptId, $otp = null)
+    {
+        return self::request(
+            'POST',
+            'authenticate/confirm',
+            array(
+                'receipt_id' => $receiptId,
+                'otp' => $otp
+            )
+        );
+    }
+
+    /**
+     * SMS 재발송
+     * Comment by GOSOMI
+     * @date: 2022-11-07
+     */
+    public static function realarmAuthentication($receiptId)
+    {
+        return self::request(
+            'POST',
+            'authenticate/realarm',
+            array(
+                'receipt_id' => $receiptId
+            )
+        );
+    }
+
 }
