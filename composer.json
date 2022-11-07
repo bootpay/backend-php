@@ -1,29 +1,35 @@
 {
-    "name": "bootpay/server-php",
-    "description": "bootpay server side php plugin for v2 api",
-    "type": "library",
-    "version": "2.0.0",
-    "keywords": ["pg", "BootPay", "paymentgateway", "card", "pay"],
-    "license": "MIT", 
-    "autoload": {
-        "psr-4": {
-            "Bootpay\\ServerPhp\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Bootpay\\ServerPhp\\Test\\": "tests/"
-        }
-    },
-    "minimum-stability": "dev",
-    "authors": [
-        {
-            "name": "bootpay",
-            "email": "bootpay.co.kr@gmail.com"
-        }
-    ],
-    "require": {
-        "php": ">= 5.3.0",
-      "ext-json": "*"
+  "name": "bootpay/server-php",
+  "description": "bootpay server side php plugin for v2 api",
+  "type": "library",
+  "version": "2.0.2",
+  "keywords": [
+    "pg",
+    "BootPay",
+    "paymentgateway",
+    "card",
+    "pay"
+  ],
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Bootpay\\ServerPhp\\": "src/"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Bootpay\\ServerPhp\\Test\\": "tests/"
+    }
+  },
+  "minimum-stability": "dev",
+  "authors": [
+    {
+      "name": "bootpay",
+      "email": "bootpay.co.kr@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">= 5.3.0",
+    "ext-json": "*"
+  }
 }
