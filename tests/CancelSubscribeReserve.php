@@ -3,13 +3,14 @@
  * Access Token 요청 예제입니다.
  */
 require_once '../vendor/autoload.php';
-// require_once __DIR__.'/../src/BootpayApi.php'; 
+
+// require_once __DIR__.'/../src/BootpayApi.php';
 
 use Bootpay\ServerPhp\BootpayApi;
 
 BootpayApi::setConfiguration(
-    '5b8f6a4d396fa665fdc2b5ea',
-    'rm6EYECr6aroQVG2ntW0A6LpWnkTgP4uQ3H18sDDUYw='
+    '59b731f084382614ebf72215',
+    'WwDv0UjfwFa04wYG0LJZZv1xwraQnlhnHE375n52X0U='
 );
 
 
@@ -17,7 +18,7 @@ $token = BootpayApi::getAccessToken();
 if (!$token->error_code) {
     try {
         $response = BootpayApi::subscribePaymentReserve(array(
-            'billing_key' => '62b41f88cf9f6d001ad212ad',
+            'billing_key' => '6406ef293049c8001ff5afd3',
             'order_name' => '테스트결제',
             'price' => 1000,
             'order_id' => time(),
@@ -28,8 +29,10 @@ if (!$token->error_code) {
             ),
             'reserve_execute_at' => date("Y-m-d H:i:s \U\T\C", time() + 5)
         ));
-         
+
         if (!$response->error_code) {
+            $lookup = BootpayApi::subscribePaymentReserveLookup($response->reserve_id);
+            var_dump($lookup);
             $cancel = BootpayApi::cancelSubscribeReserve($response->reserve_id);
             var_dump($cancel);
         }

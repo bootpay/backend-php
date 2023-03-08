@@ -14,8 +14,8 @@ class BootpayApi
         'production' => 'https://api.bootpay.co.kr/v2'
     );
     private static $postMethods = array('POST', 'PUT');
-    private static $apiVersion = '4.2.5';
-    private static $sdkVersion = '2.0.2';
+    private static $apiVersion = '4.2.7';
+    private static $sdkVersion = '2.0.3';
 
     private static function entrypoints($url)
     {
@@ -281,6 +281,19 @@ class BootpayApi
             'POST',
             'subscribe/payment/reserve',
             $reserveParameters
+        );
+    }
+
+    /**
+     * subscribePaymentReserveLookup
+     * Comment by GOSOMI
+     * @date: 2023-03-08
+     */
+    public static function subscribePaymentReserveLookup($reserveId)
+    {
+        return self::request(
+            'GET',
+            'subscribe/payment/reserve/' . $reserveId
         );
     }
 
