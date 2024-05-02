@@ -121,7 +121,7 @@ class BootpayApi
         if (!$cancelPaymentRequestParameters['receipt_id']) {
             return self::exception('receipt_id를 입력해주세요.');
         }
-        if (!$cancelPaymentRequestParameters['cancel_price']) {
+        if (isset($cancelPaymentRequestParameters['cancel_price']) && $cancelPaymentRequestParameters['cancel_price'] <= 0) {
             return self::exception('cancel_price를 0원이상으로 설정해주세요.');
         }
         return self::request(
