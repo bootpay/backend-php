@@ -14,8 +14,8 @@ class BootpayApi
         'production' => 'https://api.bootpay.co.kr/v2'
     );
     private static $postMethods = array('POST', 'PUT');
-    private static $apiVersion = '4.2.7';
-    private static $sdkVersion = '2.0.3';
+    private static $apiVersion = '5.0.0';
+    private static $sdkVersion = '2.1.0';
 
     private static function entrypoints($url)
     {
@@ -170,6 +170,20 @@ class BootpayApi
             implode('/', array('subscribe', 'billing_key', $receiptId))
         );
     }
+
+    /**
+     * Lookup Billing Key by BillingKey
+     * Comment by ehowlsla
+     */
+    public static function lookupBillingKey($billingKey)
+    {
+        return self::request(
+            'GET',
+            implode('/', array('billing_key', $billingKey))
+        );
+    }
+
+
 
     /**
      * Request Billing Key
@@ -426,4 +440,63 @@ class BootpayApi
         );
     }
 
+
+    /**
+     * 계좌 빌링키 발급
+     * Comment by ehowlsla
+     * @date: 2024-05-28
+     */
+    public static function requestSubscribeAutomaticTransferBillingKey($requestTransferBillingKeyParameters)
+    {
+        if (!$requestTransferBillingKeyParameters['pg']) {
+            return self::exception('PG Symbol을 입력해주세요.');
+        }
+        if (!$requestTransferBillingKeyParameters['subscription_id']) {
+            return self::exception('가맹점에서 설정한 고유 자동결제 ID를 입력해주세요.');
+        }
+        if (!$requestTransferBillingKeyParameters['order_name']) {
+            return self::exception('자동결제 주문명을 입력해주세요.');
+        }
+
+        if (!$requestTransferBillingKeyParameters['bank_name']) {
+            return self::exception('계좌 은행명을 입력해주세요.');
+        }
+
+        if (!$requestTransferBillingKeyParameters['bank_account']) {
+            return self::exception('계좌 번호를 입력해주세요.');
+        }
+
+        if (!$requestTransferBillingKeyParameters['username']) {
+            return self::exception('계좌주 이름을 입력해주세요.');
+        }
+
+        if (!$requestTransferBillingKeyParameters['identity_no']) {
+            return self::exception('계좌주의 생년월일 6자리 또는 사업자번호 10자리를 입력해주세요.');
+        }
+
+        return self::request(
+            'POST',
+            'request/subscribe/automatic-transfer',
+            $requestTransferBillingKeyParameters
+        );
+    }
+
+     /**
+     * 계좌 출금 동의 확인 요청
+     * Comment by ehowlsla
+     * @date: 2024-05-28
+     */
+
+     public static function publishAutomaticTransferBillingKey($receiptId)
+    {
+
+
+        return self::request(
+            'POST',
+            'request/subscribe/automatic-transfer/publish',
+             array(
+                'receipt_id' => $receiptId
+             )
+        );
+    }
 }
