@@ -15,7 +15,7 @@ class BootpayApi
     );
     private static $postMethods = array('POST', 'PUT');
     private static $apiVersion = '5.0.0';
-    private static $sdkVersion = '2.1.0';
+    private static $sdkVersion = '2.1.1';
 
     private static function entrypoints($url)
     {
@@ -248,6 +248,32 @@ class BootpayApi
             $subscriptionCardRequestParameters
         );
     }
+
+        /**
+         * Request Subscribe Payment
+         * Comment by ehowlsla
+         * @throws \Exception
+         */
+        public static function requestSubscribePayment($subscriptionRequestParameters)
+        {
+            if (!$subscriptionRequestParameters['billing_key']) {
+                return self::exception('빌링키를 입력해주세요.');
+            }
+            if (!$subscriptionRequestParameters['order_name']) {
+                return self::exception('자동결제할 상품명을 입력해주세요.');
+            }
+            if (!$subscriptionRequestParameters['price']) {
+                return self::exception('자동결제 금액을 입력해주세요.');
+            }
+            if (!$subscriptionRequestParameters['order_id']) {
+                return self::exception('자동결제할 가맹점 고유 주문번호를 입력해주세요.');
+            }
+            return self::request(
+                'POST',
+                'subscribe/payment',
+                $subscriptionRequestParameters
+            );
+        }
 
     /**
      * Destroy Billing Key
@@ -489,8 +515,6 @@ class BootpayApi
 
      public static function publishAutomaticTransferBillingKey($receiptId)
     {
-
-
         return self::request(
             'POST',
             'request/subscribe/automatic-transfer/publish',
