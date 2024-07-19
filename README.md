@@ -153,7 +153,7 @@ $response = BootpayApi::requestSubscribeCardPayment(array(
 var_dump($response);
 ```
 ## 4-3. 결제 요청하기
-원하는 시점에 4-1로 결제 승인 요청을 보내도 되지만, 빌링키 발급 이후에 바로 결제 예약 할 수 있습니다. (빌링키당 최대 10건)
+발급된 빌링키로 원하는 시점에 원하는 금액으로 결제 승인 요청을 할 수 있습니다. 잔액이 부족하거나 도난 카드 등의 특별한 건이 아니면 PG사에서 결제를 바로 승인합니다.
 ```php   
 $response = BootpayApi::subscribePaymentReserve(array(
     'billing_key' => '62b41f88cf9f6d001ad212ad',
@@ -170,7 +170,7 @@ $response = BootpayApi::subscribePaymentReserve(array(
 var_dump($response); 
 ```
 ## 4-4. 결제 예약하기
-원하는 시점에 4-1로 결제 승인 요청을 보내도 되지만, 빌링키 발급 이후에 바로 결제 예약 할 수 있습니다. (빌링키당 최대 10건)
+발급된 빌링키로 결제를 예약합니다. (빌링키당 최대 10건)
 ```php   
 $cancel = BootpayApi::cancelSubscribeReserve('62b41f88cf9f6d001ad212ad');
 var_dump($cancel);
