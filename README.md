@@ -152,6 +152,14 @@ $response = BootpayApi::requestSubscribeCardPayment(array(
 ));
 var_dump($response);
 ```
+
+
+이후 빌링키 발급 요청시 응답받은 receipt_id로, 출금 동의 확인을 요청합니다.
+```php   
+$response = BootpayApi::publishAutomaticTransferBillingKey("665534d0707116122ea322d5");
+var_dump($response);
+```
+
 ## 4-3. 결제 요청하기
 발급된 빌링키로 원하는 시점에 원하는 금액으로 결제 승인 요청을 할 수 있습니다. 잔액이 부족하거나 도난 카드 등의 특별한 건이 아니면 PG사에서 결제를 바로 승인합니다.
 ```php   
