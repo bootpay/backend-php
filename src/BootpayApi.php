@@ -34,7 +34,9 @@ class BootpayApi
         return array_merge($headers, array(
             'Content-Type: application/json',
             'Accept: application/json',
-            'Authorization: ' . (strlen(self::$token) ? "Bearer " . self::$token : null),
+            'Authorization: ' . (strlen(self::$token)
+                ? "Bearer " . self::$token
+                : "Basic " . base64_encode(self::$applicationId . ":" . self::$privateKey)),
             'BOOTPAY-API-VERSION: ' . self::$apiVersion,
             'BOOTPAY-SDK-VERSION: ' . self::$sdkVersion,
             'BOOTPAY-SDK-TYPE: 303'
@@ -82,6 +84,7 @@ class BootpayApi
     /**
      * request access token
      * Comment by GOSOMI
+     * @deprecated Basic authentication fallback is supported for direct requests
      */
     public static function getAccessToken()
     {
