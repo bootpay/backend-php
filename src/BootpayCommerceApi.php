@@ -77,14 +77,24 @@ class BootpayCommerceApi
     }
 
     // Store
-    public static function storeInfo()
+    public static function getStore()
     {
         return self::request('GET', 'store');
     }
 
-    public static function storeDetail()
+    public static function storeInfo()
+    {
+        return self::getStore();
+    }
+
+    public static function getStoreDetail()
     {
         return self::request('GET', 'store/detail');
+    }
+
+    public static function storeDetail()
+    {
+        return self::getStoreDetail();
     }
 
     // User
