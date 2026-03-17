@@ -40,8 +40,6 @@ class BootpayApi
         } else if (strlen(self::$applicationId)) {
             if (strlen(self::$token)) {
                 $auth = 'Bearer ' . self::$token;
-            } else if (strlen(self::$privateKey)) {
-                $auth = 'Basic ' . base64_encode(self::$applicationId . ':' . self::$privateKey);
             }
         }
 
