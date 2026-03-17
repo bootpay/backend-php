@@ -7,6 +7,8 @@ class BootpayApi
     static $token = '';
     private static $applicationId = '';
     private static $privateKey = '';
+    private static $clientKey = '';
+    private static $secretKey = '';
     private static $mode = 'production';
     private static $API_URL = array(
         'development' => 'https://dev-api.bootpay.co.kr/v2',
@@ -31,12 +33,22 @@ class BootpayApi
     private static function createHeaders($headers = null)
     {
         !isset($headers) && $headers = array();
+
+        $auth = null;
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            $auth = 'Basic ' . base64_encode(self::$clientKey . ':' . self::$secretKey);
+        } else if (strlen(self::$applicationId)) {
+            if (strlen(self::$token)) {
+                $auth = 'Bearer ' . self::$token;
+            } else if (strlen(self::$privateKey)) {
+                $auth = 'Basic ' . base64_encode(self::$applicationId . ':' . self::$privateKey);
+            }
+        }
+
         return array_merge($headers, array(
             'Content-Type: application/json',
             'Accept: application/json',
-            'Authorization: ' . (strlen(self::$token)
-                ? "Bearer " . self::$token
-                : "Basic " . base64_encode(self::$applicationId . ":" . self::$privateKey)),
+            'Authorization: ' . $auth,
             'BOOTPAY-API-VERSION: ' . self::$apiVersion,
             'BOOTPAY-SDK-VERSION: ' . self::$sdkVersion,
             'BOOTPAY-SDK-TYPE: 303'
@@ -74,10 +86,12 @@ class BootpayApi
         throw new \Exception($message);
     }
 
-    public static function setConfiguration($applicationId, $privateKey, $mode = 'production')
+    public static function setConfiguration($applicationId, $privateKey, $mode = 'production', $clientKey = '', $secretKey = '')
     {
         self::$applicationId = $applicationId;
         self::$privateKey = $privateKey;
+        self::$clientKey = $clientKey;
+        self::$secretKey = $secretKey;
         self::$mode = $mode;
     }
 
