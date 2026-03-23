@@ -11,6 +11,7 @@ use Bootpay\ServerPhp\Commerce\OrderCancelModule;
 use Bootpay\ServerPhp\Commerce\OrderSubscriptionModule;
 use Bootpay\ServerPhp\Commerce\OrderSubscriptionBillModule;
 use Bootpay\ServerPhp\Commerce\OrderSubscriptionAdjustmentModule;
+use Bootpay\ServerPhp\Commerce\StoreModule;
 
 class BootpayCommerceApi
 {
@@ -39,6 +40,7 @@ class BootpayCommerceApi
     public $orderSubscription;
     public $orderSubscriptionBill;
     public $orderSubscriptionAdjustment;
+    public $store;
 
     public function __construct($clientKey = null, $secretKey = null, $mode = 'production')
     {
@@ -59,6 +61,7 @@ class BootpayCommerceApi
         $this->orderSubscription = new OrderSubscriptionModule($this);
         $this->orderSubscriptionBill = new OrderSubscriptionBillModule($this);
         $this->orderSubscriptionAdjustment = new OrderSubscriptionAdjustmentModule($this);
+        $this->store = new StoreModule($this);
     }
 
     public function setConfiguration($clientKey, $secretKey, $mode = 'production')

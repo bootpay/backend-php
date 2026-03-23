@@ -125,6 +125,61 @@ class OrderSubscriptionModule
         return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}", $params);
     }
 
+    /**
+     * 관리자 정기구독 승인
+     * @param string $orderSubscriptionId 정기구독 ID
+     * @param array $params 승인 파라미터
+     * @return object
+     */
+    public function supervisorApprove($orderSubscriptionId, $params = array())
+    {
+        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/approve", $params);
+    }
+
+    /**
+     * 관리자 정기구독 거절
+     * @param string $orderSubscriptionId 정기구독 ID
+     * @param array $params 거절 파라미터
+     * @return object
+     */
+    public function supervisorReject($orderSubscriptionId, $params = array())
+    {
+        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/reject", $params);
+    }
+
+    /**
+     * 관리자 정기구독 해지
+     * @param string $orderSubscriptionId 정기구독 ID
+     * @param array $params 해지 파라미터
+     * @return object
+     */
+    public function supervisorTerminate($orderSubscriptionId, $params = array())
+    {
+        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/terminate", $params);
+    }
+
+    /**
+     * 관리자 정기구독 일시정지
+     * @param string $orderSubscriptionId 정기구독 ID
+     * @param array $params 일시정지 파라미터
+     * @return object
+     */
+    public function supervisorPause($orderSubscriptionId, $params = array())
+    {
+        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/pause", $params);
+    }
+
+    /**
+     * 관리자 정기구독 재개
+     * @param string $orderSubscriptionId 정기구독 ID
+     * @param array $params 재개 파라미터
+     * @return object
+     */
+    public function supervisorResume($orderSubscriptionId, $params = array())
+    {
+        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/resume", $params);
+    }
+
     private function buildQueryString($params)
     {
         if ($params === null || empty($params)) {
