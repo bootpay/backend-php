@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="vendor/autoload.php"
+    colors="true"
+    verbose="true"
+    stopOnFailure="false"
+>
+    <testsuites>
+        <testsuite name="PG">
+            <directory>tests/Pg</directory>
+        </testsuite>
+        <testsuite name="Commerce">
+            <directory>tests/Commerce</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="BOOTPAY_ENV" value="development"/>
+    </php>
+</phpunit>
