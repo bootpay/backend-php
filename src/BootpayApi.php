@@ -116,9 +116,6 @@ class BootpayApi
         if (!$cancelPaymentRequestParameters['receipt_id']) {
             return self::exception('receipt_id를 입력해주세요.');
         }
-        if (!$cancelPaymentRequestParameters['cancel_price']) {
-            return self::exception('cancel_price를 0원이상으로 설정해주세요.');
-        }
         return self::request(
             'POST',
             'cancel',
@@ -304,6 +301,186 @@ class BootpayApi
             'PUT',
             'escrow/shipping/start/' . $shippingParameters['receipt_id'],
             $shippingParameters
+        );
+    }
+
+    /**
+     * Request Subscribe Payment
+     * @throws \Exception
+     */
+    public static function requestSubscribePayment($subscribePaymentParameters)
+    {
+        if (!$subscribePaymentParameters['billing_key']) {
+            return self::exception('빌링키를 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['order_name']) {
+            return self::exception('자동결제할 상품명을 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['price']) {
+            return self::exception('자동결제 금액을 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['order_id']) {
+            return self::exception('자동결제할 가맹점 고유 주문번호를 입력해주세요.');
+        }
+        return self::request(
+            'POST',
+            'subscribe/payment',
+            $subscribePaymentParameters
+        );
+    }
+
+    /**
+     * Request Subscribe Automatic Transfer Billing Key
+     * @throws \Exception
+     */
+    public static function requestSubscribeAutomaticTransferBillingKey($params)
+    {
+        return self::request(
+            'POST',
+            'request/subscribe/automatic-transfer',
+            $params
+        );
+    }
+
+    /**
+     * Publish Automatic Transfer Billing Key
+     * @throws \Exception
+     */
+    public static function publishAutomaticTransferBillingKey($receiptId)
+    {
+        return self::request(
+            'POST',
+            'request/subscribe/automatic-transfer/publish',
+            array(
+                'receipt_id' => $receiptId
+            )
+        );
+    }
+
+    /**
+     * Lookup Billing Key
+     */
+    public static function lookupBillingKey($billingKey)
+    {
+        return self::request(
+            'GET',
+            implode('/', array('billing_key', $billingKey))
+        );
+    }
+
+    /**
+     * Subscribe Payment Reserve Lookup
+     */
+    public static function subscribePaymentReserveLookup($reserveId)
+    {
+        return self::request(
+            'GET',
+            'subscribe/payment/reserve/' . $reserveId
+        );
+    }
+
+    /**
+     * Request Authentication
+     * @throws \Exception
+     */
+    public static function requestAuthentication($params)
+    {
+        return self::request(
+            'POST',
+            'request/authentication',
+            $params
+        );
+    }
+
+    /**
+     * Confirm Authentication
+     * @throws \Exception
+     */
+    public static function confirmAuthentication($receiptId, $otp = null)
+    {
+        $data = array(
+            'receipt_id' => $receiptId
+        );
+        if ($otp !== null) {
+            $data['otp'] = $otp;
+        }
+        return self::request(
+            'POST',
+            'authenticate/confirm',
+            $data
+        );
+    }
+
+    /**
+     * Realarm Authentication
+     * @throws \Exception
+     */
+    public static function realarmAuthentication($receiptId)
+    {
+        return self::request(
+            'POST',
+            'authenticate/realarm',
+            array(
+                'receipt_id' => $receiptId
+            )
+        );
+    }
+
+    /**
+     * Cash Receipt Publish On Receipt
+     * @throws \Exception
+     */
+    public static function cashReceiptPublishOnReceipt($params)
+    {
+        return self::request(
+            'POST',
+            'request/receipt/cash/publish',
+            $params
+        );
+    }
+
+    /**
+     * Cash Receipt Cancel On Receipt
+     * @throws \Exception
+     */
+    public static function cashReceiptCancelOnReceipt($receiptId, $params = array())
+    {
+        $url = 'request/receipt/cash/cancel/' . $receiptId;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return self::request(
+            'DELETE',
+            $url
+        );
+    }
+
+    /**
+     * Request Cash Receipt
+     * @throws \Exception
+     */
+    public static function requestCashReceipt($params)
+    {
+        return self::request(
+            'POST',
+            'request/cash/receipt',
+            $params
+        );
+    }
+
+    /**
+     * Cancel Cash Receipt
+     * @throws \Exception
+     */
+    public static function cancelCashReceipt($receiptId, $params = array())
+    {
+        $url = 'request/cash/receipt/' . $receiptId;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return self::request(
+            'DELETE',
+            $url
         );
     }
 }
