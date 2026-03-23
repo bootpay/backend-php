@@ -483,4 +483,45 @@ class BootpayApi
             $url
         );
     }
+
+    /**
+     * Get User Wallets
+     */
+    public static function getUserWallets($userId, $sandbox = false)
+    {
+        $sandboxStr = $sandbox ? 'true' : 'false';
+        $url = 'wallet?' . http_build_query(array(
+            'user_id' => $userId,
+            'sandbox' => $sandboxStr
+        ));
+        return self::request(
+            'GET',
+            $url
+        );
+    }
+
+    /**
+     * Request Wallet Payment
+     * @throws \Exception
+     */
+    public static function requestWalletPayment($params)
+    {
+        if (!$params['user_id']) {
+            return self::exception('사용자 아이디를 입력해주세요.');
+        }
+        if (!$params['order_name']) {
+            return self::exception('주문명을 입력해주세요.');
+        }
+        if (!$params['price']) {
+            return self::exception('결제 금액을 입력해주세요.');
+        }
+        if (!$params['order_id']) {
+            return self::exception('가맹점 고유 주문번호를 입력해주세요.');
+        }
+        return self::request(
+            'POST',
+            'wallet/payment',
+            $params
+        );
+    }
 }
