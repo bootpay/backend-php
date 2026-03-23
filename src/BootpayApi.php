@@ -55,7 +55,7 @@ class BootpayApi
         $errno = curl_errno($channel);
         $errMsg = curl_error($channel);
         if ($errno) {
-            throw new Exception('error: ' . $errno . ', msg: ' . $errMsg);
+            throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
         }
         curl_close($channel);
         $json = json_decode(trim($response));

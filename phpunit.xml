@@ -7,10 +7,10 @@
 >
     <testsuites>
         <testsuite name="PG">
-            <directory>tests/Pg</directory>
+            <directory>tests/pg</directory>
         </testsuite>
         <testsuite name="Commerce">
-            <directory>tests/Commerce</directory>
+            <directory>tests/commerce</directory>
         </testsuite>
     </testsuites>
     <php>
