@@ -9,21 +9,35 @@ use Bootpay\ServerPhp\BootpayCommerceApi;
 /**
  * Base test class for Bootpay SDK integration tests.
  *
- * Reads BOOTPAY_ENV env var (default: "development") to select keys.
+ * Reads BOOTPAY_ENV env var (default: "production") to select keys.
  */
+
+function loadBootpayDotEnv() {
+    foreach ([__DIR__ . '/../.env', __DIR__ . '/.env'] as $file) {
+        if (!file_exists($file)) continue;
+        foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            $line = trim($line);
+            if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            $value = trim($value, '"\'');
+            if (getenv($key) === false) putenv($key . '=' . $value);
+        }
+    }
+}
+
+function bootpayEnv($key, $fallback) {
+    $value = getenv($key);
+    return $value === false || $value === '' ? $fallback : $value;
+}
+
+loadBootpayDotEnv();
+
 class TestConfig extends TestCase
 {
-    // PG API keys
-    const PG_DEV_APPLICATION_ID = '59bfc738e13f337dbd6ca48a';
-    const PG_DEV_PRIVATE_KEY = 'pDc0NwlkEX3aSaHTp/PPL/i8vn5E/CqRChgyEp/gHD0=';
-    const PG_PROD_APPLICATION_ID = '5b8f6a4d396fa665fdc2b5ea';
-    const PG_PROD_PRIVATE_KEY = 'rm6EYECr6aroQVG2ntW0A6LpWnkTgP4uQ3H18sDDUYw=';
-
-    // Commerce API keys
-    const COMMERCE_DEV_CLIENT_KEY = 'hxS-Up--5RvT6oU6QJE0JA';
-    const COMMERCE_DEV_SECRET_KEY = 'r5zxvDcQJiAP2PBQ0aJjSHQtblNmYFt6uFoEMhti_mg=';
-    const COMMERCE_PROD_CLIENT_KEY = 'sEN72kYZBiyMNytA8nUGxQ';
-    const COMMERCE_PROD_SECRET_KEY = 'rnZLJamENRgfwTccwmI_Uu9cxsPpAV9X2W-Htg73yfU=';
+    // PG/Commerce API keys 는 .env / 환경변수 로 주입한다 (.env.example 참고)
+    // 새 ck/sk 와 별개로 legacy application_id/private_key 도 .env 로 노출하여 두 인증 모드를 모두 테스트한다.
 
     // Test data IDs
     const TEST_RECEIPT_ID = '628b2206d01c7e00209b6087';
@@ -43,39 +57,80 @@ class TestConfig extends TestCase
      */
     protected static function getEnv(): string
     {
-        return getenv('BOOTPAY_ENV') ?: 'development';
+        return getenv('BOOTPAY_ENV') ?: 'production';
     }
 
     /**
-     * Configure PG API with appropriate keys
+     * Get active PG auth mode: 'new' (ck/sk) or 'legacy' (application_id/private_key).
+     * 매 실행 시 BOOTPAY_AUTH_MODE 환경변수로 토글한다.
+     */
+    protected static function getAuthMode(): string
+    {
+        $mode = strtolower(getenv('BOOTPAY_AUTH_MODE') ?: 'new');
+        return $mode === '' ? 'new' : $mode;
+    }
+
+    /**
+     * Configure PG API with appropriate keys (read from .env / environment variables).
+     * BOOTPAY_AUTH_MODE 에 따라 ck/sk (default) 또는 legacy application_id/private_key 사용.
      */
     protected static function setupPgApi(): void
     {
+        if (self::getAuthMode() === 'legacy') {
+            self::setupPgApiLegacy();
+            return;
+        }
         $env = self::getEnv();
+        echo "[BOOTPAY_AUTH_MODE=new] PG: client_key/secret_key (Basic Auth) | env={$env}" . PHP_EOL;
         if ($env === 'production') {
-            BootpayApi::setConfiguration(
-                self::PG_PROD_APPLICATION_ID,
-                self::PG_PROD_PRIVATE_KEY,
+            BootpayApi::setClientKeyConfiguration(
+                bootpayEnv('BOOTPAY_PG_CLIENT_KEY_PROD', ''),
+                bootpayEnv('BOOTPAY_PG_SECRET_KEY_PROD', ''),
                 'production'
             );
         } else {
-            BootpayApi::setConfiguration(
-                self::PG_DEV_APPLICATION_ID,
-                self::PG_DEV_PRIVATE_KEY,
+            BootpayApi::setClientKeyConfiguration(
+                bootpayEnv('BOOTPAY_PG_CLIENT_KEY_DEV', ''),
+                bootpayEnv('BOOTPAY_PG_SECRET_KEY_DEV', ''),
                 'development'
             );
         }
     }
 
     /**
-     * Configure PG API and get access token
+     * Configure PG API and get access token if needed.
+     * legacy 모드에서만 실제 토큰 발급. ck/sk 모드에서는 setupPgApi 만 호출 (Basic Auth 가 매 요청 처리).
      */
     protected static function setupPgApiWithToken(): void
     {
         self::setupPgApi();
-        $response = BootpayApi::getAccessToken();
-        if (isset($response->error_code)) {
-            throw new \RuntimeException('Failed to get PG access token: ' . ($response->message ?? 'unknown error'));
+        if (self::getAuthMode() === 'legacy') {
+            $response = BootpayApi::getAccessToken();
+            if (isset($response->error_code)) {
+                throw new \RuntimeException('Failed to get PG access token: ' . ($response->message ?? 'unknown error'));
+            }
+        }
+    }
+
+    /**
+     * Configure PG API with legacy application_id/private_key (호환성 검증용)
+     */
+    protected static function setupPgApiLegacy(): void
+    {
+        $env = self::getEnv();
+        echo "[BOOTPAY_AUTH_MODE=legacy] PG: application_id/private_key (Bearer) | env={$env}" . PHP_EOL;
+        if ($env === 'production') {
+            BootpayApi::setConfiguration(
+                bootpayEnv('BOOTPAY_PG_APPLICATION_ID_PROD', ''),
+                bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_PROD', ''),
+                'production'
+            );
+        } else {
+            BootpayApi::setConfiguration(
+                bootpayEnv('BOOTPAY_PG_APPLICATION_ID_DEV', ''),
+                bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_DEV', ''),
+                'development'
+            );
         }
     }
 
@@ -87,14 +142,14 @@ class TestConfig extends TestCase
         $env = self::getEnv();
         if ($env === 'production') {
             return new BootpayCommerceApi(
-                self::COMMERCE_PROD_CLIENT_KEY,
-                self::COMMERCE_PROD_SECRET_KEY,
+                bootpayEnv('BOOTPAY_COMMERCE_CLIENT_KEY_PROD', ''),
+                bootpayEnv('BOOTPAY_COMMERCE_SECRET_KEY_PROD', ''),
                 'production'
             );
         } else {
             return new BootpayCommerceApi(
-                self::COMMERCE_DEV_CLIENT_KEY,
-                self::COMMERCE_DEV_SECRET_KEY,
+                bootpayEnv('BOOTPAY_COMMERCE_CLIENT_KEY_DEV', ''),
+                bootpayEnv('BOOTPAY_COMMERCE_SECRET_KEY_DEV', ''),
                 'development'
             );
         }

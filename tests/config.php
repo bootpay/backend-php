@@ -5,34 +5,58 @@
  * 환경에 맞는 키를 선택하여 사용합니다.
  */
 
+
+function loadBootpayDotEnv() {
+    foreach ([__DIR__ . '/../.env', __DIR__ . '/.env'] as $file) {
+        if (!file_exists($file)) continue;
+        foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            $line = trim($line);
+            if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) continue;
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            $value = trim($value, '"\'');
+            if (getenv($key) === false) putenv($key . '=' . $value);
+        }
+    }
+}
+
+function bootpayEnv($key, $fallback) {
+    $value = getenv($key);
+    return $value === false || $value === '' ? $fallback : $value;
+}
+
+loadBootpayDotEnv();
+
 // =====================================================
-// PG API 키
+// PG/Commerce API 키 - .env / 환경변수 로 주입한다 (.env.example 참고)
 // =====================================================
 
-// Production 환경
-const PG_PROD_APPLICATION_ID = '5b8f6a4d396fa665fdc2b5ea';
-const PG_PROD_PRIVATE_KEY = 'rm6EYECr6aroQVG2ntW0A6LpWnkTgP4uQ3H18sDDUYw=';
+// PG (ck/sk)
+define('PG_PROD_CLIENT_KEY', bootpayEnv('BOOTPAY_PG_CLIENT_KEY_PROD', ''));
+define('PG_PROD_SECRET_KEY', bootpayEnv('BOOTPAY_PG_SECRET_KEY_PROD', ''));
+define('PG_DEV_CLIENT_KEY', bootpayEnv('BOOTPAY_PG_CLIENT_KEY_DEV', ''));
+define('PG_DEV_SECRET_KEY', bootpayEnv('BOOTPAY_PG_SECRET_KEY_DEV', ''));
+// PG legacy application_id/private_key (호환성 검증용)
+define('PG_PROD_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_PROD', '5b8f6a4d396fa665fdc2b5ea'));
+define('PG_PROD_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_PROD', 'rm6EYECr6aroQVG2ntW0A6LpWnkTgP4uQ3H18sDDUYw='));
+define('PG_DEV_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_DEV', '59bfc738e13f337dbd6ca48a'));
+define('PG_DEV_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_DEV', 'pDc0NwlkEX3aSaHTp/PPL/i8vn5E/CqRChgyEp/gHD0='));
 
-// Development 환경
-const PG_DEV_APPLICATION_ID = '59bfc738e13f337dbd6ca48a';
-const PG_DEV_PRIVATE_KEY = 'pDc0NwlkEX3aSaHTp/PPL/i8vn5E/CqRChgyEp/gHD0=';
-
-// =====================================================
-// Commerce API 키
-// =====================================================
-
-// Production 환경
-const COMMERCE_PROD_CLIENT_KEY = 'sEN72kYZBiyMNytA8nUGxQ';
-const COMMERCE_PROD_SECRET_KEY = 'rnZLJamENRgfwTccwmI_Uu9cxsPpAV9X2W-Htg73yfU=';
-
-// Development 환경
-const COMMERCE_DEV_CLIENT_KEY = 'hxS-Up--5RvT6oU6QJE0JA';
-const COMMERCE_DEV_SECRET_KEY = 'r5zxvDcQJiAP2PBQ0aJjSHQtblNmYFt6uFoEMhti_mg=';
+// Commerce (ck/sk)
+define('COMMERCE_PROD_CLIENT_KEY', bootpayEnv('BOOTPAY_COMMERCE_CLIENT_KEY_PROD', ''));
+define('COMMERCE_PROD_SECRET_KEY', bootpayEnv('BOOTPAY_COMMERCE_SECRET_KEY_PROD', ''));
+define('COMMERCE_DEV_CLIENT_KEY', bootpayEnv('BOOTPAY_COMMERCE_CLIENT_KEY_DEV', ''));
+define('COMMERCE_DEV_SECRET_KEY', bootpayEnv('BOOTPAY_COMMERCE_SECRET_KEY_DEV', ''));
 
 // =====================================================
 // 현재 사용할 환경 설정 (development / production)
 // =====================================================
-const CURRENT_ENV = 'production';
+define('CURRENT_ENV', bootpayEnv('BOOTPAY_ENV', 'production'));
+
+// PG 인증 방식: 'new' (client_key/secret_key) 또는 'legacy' (application_id/private_key)
+// 매 실행 시 BOOTPAY_AUTH_MODE 환경변수로 토글한다.
+define('BOOTPAY_AUTH_MODE', strtolower(bootpayEnv('BOOTPAY_AUTH_MODE', 'new')));
 
 // =====================================================
 // 테스트 데이터 (Java SDK 예제와 동일)
@@ -62,8 +86,24 @@ const TEST_DATA = [
     'certificate_receipt_id' => '61b009aaec81b4057e7f6ecd',
 ];
 
-// 환경에 따른 키 반환 함수
+// 환경에 따른 키 반환 함수 (ck/sk)
 function getPgKeys() {
+    if (CURRENT_ENV === 'development') {
+        return [
+            'client_key' => PG_DEV_CLIENT_KEY,
+            'secret_key' => PG_DEV_SECRET_KEY,
+            'mode' => 'development'
+        ];
+    }
+    return [
+        'client_key' => PG_PROD_CLIENT_KEY,
+        'secret_key' => PG_PROD_SECRET_KEY,
+        'mode' => 'production'
+    ];
+}
+
+// PG legacy application_id/private_key 반환
+function getPgLegacyKeys() {
     if (CURRENT_ENV === 'development') {
         return [
             'application_id' => PG_DEV_APPLICATION_ID,
@@ -76,6 +116,31 @@ function getPgKeys() {
         'private_key' => PG_PROD_PRIVATE_KEY,
         'mode' => 'production'
     ];
+}
+
+// AUTH_MODE 에 따라 활성화된 PG config 반환
+function getActivePgConfig() {
+    return BOOTPAY_AUTH_MODE === 'legacy' ? getPgLegacyKeys() : getPgKeys();
+}
+
+// AUTH_MODE 에 따라 BootpayApi 정적 setter 호출
+function setupActiveBootpayApi() {
+    $cfg = getActivePgConfig();
+    if (BOOTPAY_AUTH_MODE === 'legacy') {
+        echo "[BOOTPAY_AUTH_MODE=legacy] PG: application_id/private_key (Bearer) | env=" . CURRENT_ENV . PHP_EOL;
+        \Bootpay\ServerPhp\BootpayApi::setConfiguration(
+            $cfg['application_id'],
+            $cfg['private_key'],
+            $cfg['mode']
+        );
+    } else {
+        echo "[BOOTPAY_AUTH_MODE=new] PG: client_key/secret_key (Basic Auth) | env=" . CURRENT_ENV . PHP_EOL;
+        \Bootpay\ServerPhp\BootpayApi::setClientKeyConfiguration(
+            $cfg['client_key'],
+            $cfg['secret_key'],
+            $cfg['mode']
+        );
+    }
 }
 
 function getCommerceKeys() {

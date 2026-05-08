@@ -7,6 +7,8 @@ class BootpayApi
     static $token = '';
     private static $applicationId = '';
     private static $privateKey = '';
+    private static $clientKey = '';
+    private static $secretKey = '';
     private static $mode = 'production';
     private static $API_URL = array(
         'development' => 'https://dev-api.bootpay.co.kr/v2',
@@ -26,14 +28,28 @@ class BootpayApi
         return implode("\r\n", $headers);
     }
 
+    private static function authorizationHeader()
+    {
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            return 'Basic ' . base64_encode(self::$clientKey . ':' . self::$secretKey);
+        }
+        return strlen(self::$token) ? 'Bearer ' . self::$token : null;
+    }
+
     private static function createHeaders($headers = null)
     {
         !isset($headers) && $headers = array();
-        return array_merge($headers, array(
+        $merged = array_merge($headers, array(
             'Content-Type: application/json',
-            'Accept: application/json',
-            'Authorization: ' . (strlen(self::$token) ? "Bearer " . self::$token : null)
+            'Accept: application/json'
         ));
+
+        $authorization = self::authorizationHeader();
+        if (isset($authorization) && strlen($authorization)) {
+            $merged[] = 'Authorization: ' . $authorization;
+        }
+
+        return $merged;
     }
 
     private static function request($method, $url, $data = null, $headers = null)
@@ -71,6 +87,19 @@ class BootpayApi
     {
         self::$applicationId = $applicationId;
         self::$privateKey = $privateKey;
+        self::$clientKey = '';
+        self::$secretKey = '';
+        self::$token = '';
+        self::$mode = $mode;
+    }
+
+    public static function setClientKeyConfiguration($clientKey, $secretKey, $mode = 'production')
+    {
+        self::$clientKey = $clientKey;
+        self::$secretKey = $secretKey;
+        self::$applicationId = '';
+        self::$privateKey = '';
+        self::$token = '';
         self::$mode = $mode;
     }
 
@@ -80,15 +109,22 @@ class BootpayApi
      */
     public static function getAccessToken()
     {
+        // client_key/secret_key 인증은 매 요청에 Basic Auth 헤더가 자동 부착된다.
+        // request/token 호출이 불필요하므로 합성 응답을 즉시 반환한다.
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            self::$token = '';
+            $synthetic = new \stdClass();
+            $synthetic->access_token = '';
+            $synthetic->expire_in = 0;
+            return $synthetic;
+        }
+
         $response = self::request(
             'POST',
             'request/token',
-            array(
-                'application_id' => self::$applicationId,
-                'private_key' => self::$privateKey
-            )
+            array('application_id' => self::$applicationId, 'private_key' => self::$privateKey)
         );
-        if (!$response->error_code) {
+        if ($response && (!isset($response->error_code) || !$response->error_code)) {
             self::$token = $response->access_token;
         }
         return $response;
@@ -486,9 +522,16 @@ class BootpayApi
 
     /**
      * Get User Wallets
+     *
+     * @deprecated 다음 메이저 버전에서 제거 예정. wallet 엔드포인트는 폐기 예정이며,
+     *             결제는 Request::PaymentController#create 의 wallet_id + user_token 으로 처리됩니다.
      */
     public static function getUserWallets($userId, $sandbox = false)
     {
+        @trigger_error(
+            'BootpayApi::getUserWallets() is deprecated and will be removed in a future major version.',
+            E_USER_DEPRECATED
+        );
         $sandboxStr = $sandbox ? 'true' : 'false';
         $url = 'wallet?' . http_build_query(array(
             'user_id' => $userId,
@@ -502,10 +545,17 @@ class BootpayApi
 
     /**
      * Request Wallet Payment
+     *
+     * @deprecated 다음 메이저 버전에서 제거 예정. wallet 엔드포인트는 폐기 예정이며,
+     *             결제는 wallet_id + user_token 흐름으로 전환하세요.
      * @throws \Exception
      */
     public static function requestWalletPayment($params)
     {
+        @trigger_error(
+            'BootpayApi::requestWalletPayment() is deprecated and will be removed in a future major version.',
+            E_USER_DEPRECATED
+        );
         if (!$params['user_id']) {
             return self::exception('사용자 아이디를 입력해주세요.');
         }

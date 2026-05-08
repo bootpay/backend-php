@@ -166,10 +166,9 @@ class BootpayCommerceApi
             'BOOTPAY-ROLE: ' . $this->role
         );
 
-        if ($useBasicAuth) {
-            $defaultHeaders[] = 'Authorization: ' . $this->getBasicAuthHeader();
-        } elseif (!empty($this->token)) {
-            $defaultHeaders[] = 'Authorization: Bearer ' . $this->token;
+        $basicAuth = $this->getBasicAuthHeader();
+        if (!empty($basicAuth)) {
+            $defaultHeaders[] = 'Authorization: ' . $basicAuth;
         }
 
         return array_merge($defaultHeaders, $headers);
@@ -235,8 +234,9 @@ class BootpayCommerceApi
             'BOOTPAY-ROLE: ' . $this->role
         );
 
-        if (!empty($this->token)) {
-            $multipartHeaders[] = 'Authorization: Bearer ' . $this->token;
+        $basicAuth = $this->getBasicAuthHeader();
+        if (!empty($basicAuth)) {
+            $multipartHeaders[] = 'Authorization: ' . $basicAuth;
         }
 
         curl_setopt($channel, CURLOPT_HTTPHEADER, $multipartHeaders);

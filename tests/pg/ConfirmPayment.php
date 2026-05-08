@@ -7,12 +7,7 @@ require_once __DIR__ . '/../config.php';
 
 use Bootpay\ServerPhp\BootpayApi;
 
-$keys = getPgKeys();
-
-BootpayApi::setConfiguration(
-    $keys['application_id'],
-    $keys['private_key']
-);
+setupActiveBootpayApi();
 
 $token = BootpayApi::getAccessToken();
 if (!isset($token->error_code)) {
