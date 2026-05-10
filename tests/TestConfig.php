@@ -49,8 +49,9 @@ class TestConfig extends TestCase
     const TEST_BILLING_KEY = '628b2644d01c7e00209b6092';
     const TEST_BILLING_KEY_2 = '66542dfb4d18d5fc7b43e1b6';
     const TEST_RESERVE_ID = '6490149ca575b40024f0b70d';
+    const TEST_RESERVE_ID_2 = '628b316cd01c7e00219b6081';
     const TEST_USER_ID = '1234';
-    const TEST_CERTIFICATE_RECEIPT_ID = '61b009aaec81b4057e7f6ecd';
+    const TEST_CERTIFICATE_RECEIPT_ID = '69fd7187564d1f550535538c';
 
     /**
      * Get current environment mode
