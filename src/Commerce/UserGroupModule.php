@@ -67,7 +67,7 @@ class UserGroupModule
      */
     public function userCreate($userGroupId, $userId)
     {
-        return $this->bootpay->post("user-groups/{$userGroupId}/add_user", array('user_id' => $userId));
+        return $this->bootpay->post("user-groups/{$userGroupId}/user", array('user_id' => $userId));
     }
 
     /**
@@ -78,7 +78,7 @@ class UserGroupModule
      */
     public function userDelete($userGroupId, $userId)
     {
-        return $this->bootpay->delete("user-groups/{$userGroupId}/remove_user?user_id={$userId}");
+        return $this->bootpay->delete("user-groups/{$userGroupId}/user/{$userId}");
     }
 
     /**
