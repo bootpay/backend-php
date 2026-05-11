@@ -8,6 +8,9 @@ tests/RequestSubscribeBillingKey.php
 .env.*
 !.env.example
 
+# Build artifacts
+vendor/
+
 # Tool runtime dirs
 .omj/
 .phpunit.result.cache
