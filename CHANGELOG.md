@@ -1,3 +1,11 @@
+### 2.4.0
+* Commerce: 5개 모듈 신규 추가 (NodeJS SDK parity).
+  * `Category`, `Coupon`, `Point`, `Cart`, `OrderSubscriptionRequest` 모듈을 `src/Commerce/` 에 추가.
+  * `BootpayCommerceApi` facade 에 5개 모듈 wire-up.
+  * `list` 가 PHP 예약어 충돌이 있는 위치에서는 `getList()` 네이밍 사용.
+* Commerce: user-group URL parity 수정 — `/add_user` → `/user`, `/remove_user` → `/user/{userId}`.
+* chore: `vendor/` 디렉토리 gitignore 처리 및 트래킹 해제 (composer build artifact).
+
 ### 2.3.0
 * 인증: client_key/secret_key Basic Auth 지원 (PG + Commerce 공통).
   * 기존 application_id/private_key Bearer 방식 하위 호환 유지.
