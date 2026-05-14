@@ -223,11 +223,9 @@ class BootpayCommerceApi
         $errMsg = curl_error($channel);
 
         if ($errno) {
-            curl_close($channel);
             throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
         }
 
-        curl_close($channel);
         $json = json_decode(trim($response));
 
         return $json;
@@ -285,11 +283,9 @@ class BootpayCommerceApi
         $errMsg = curl_error($channel);
 
         if ($errno) {
-            curl_close($channel);
             throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
         }
 
-        curl_close($channel);
         $json = json_decode(trim($response));
 
         return $json;

@@ -1,3 +1,7 @@
+### 2.4.1
+* PHP 8.5 호환성: `curl_close()` 호출 제거 (PHP 8.0+ 부터 no-op, PHP 8.5 부터 deprecated). 동작 변화 없음.
+  * `src/BootpayApi.php`, `src/BootpayCommerceApi.php` (json + multipart).
+
 ### 2.4.0
 * Commerce: 5개 모듈 신규 추가 (NodeJS SDK parity).
   * `Category`, `Coupon`, `Point`, `Cart`, `OrderSubscriptionRequest` 모듈을 `src/Commerce/` 에 추가.
