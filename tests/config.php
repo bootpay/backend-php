@@ -38,10 +38,10 @@ define('PG_PROD_SECRET_KEY', bootpayEnv('BOOTPAY_PG_SECRET_KEY_PROD', ''));
 define('PG_DEV_CLIENT_KEY', bootpayEnv('BOOTPAY_PG_CLIENT_KEY_DEV', ''));
 define('PG_DEV_SECRET_KEY', bootpayEnv('BOOTPAY_PG_SECRET_KEY_DEV', ''));
 // PG legacy application_id/private_key (호환성 검증용)
-define('PG_PROD_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_PROD', '5b8f6a4d396fa665fdc2b5ea'));
-define('PG_PROD_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_PROD', 'rm6EYECr6aroQVG2ntW0A6LpWnkTgP4uQ3H18sDDUYw='));
-define('PG_DEV_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_DEV', '59bfc738e13f337dbd6ca48a'));
-define('PG_DEV_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_DEV', 'pDc0NwlkEX3aSaHTp/PPL/i8vn5E/CqRChgyEp/gHD0='));
+define('PG_PROD_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_PROD', ''));
+define('PG_PROD_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_PROD', ''));
+define('PG_DEV_APPLICATION_ID', bootpayEnv('BOOTPAY_PG_APPLICATION_ID_DEV', ''));
+define('PG_DEV_PRIVATE_KEY', bootpayEnv('BOOTPAY_PG_PRIVATE_KEY_DEV', ''));
 
 // Commerce (ck/sk)
 define('COMMERCE_PROD_CLIENT_KEY', bootpayEnv('BOOTPAY_COMMERCE_CLIENT_KEY_PROD', ''));
