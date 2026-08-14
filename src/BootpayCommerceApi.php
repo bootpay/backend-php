@@ -76,12 +76,52 @@ class BootpayCommerceApi
         );
     }
 
-    private static function supervisorHeaders($idempotencyKey = null)
+    /**
+     * Idempotency-Key 헤더 생성
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    private static function idempotencyHeaders($idempotencyKey = null)
     {
         return array(
-            'Idempotency-Key: ' . (isset($idempotencyKey) && strlen($idempotencyKey) ? $idempotencyKey : self::uuid()),
-            'Bootpay-Role: supervisor'
+            'Idempotency-Key: ' . (isset($idempotencyKey) && strlen($idempotencyKey) ? $idempotencyKey : self::uuid())
         );
+    }
+
+    /**
+     * 회원 JWT를 함께 전달하는 헤더 생성 (Bootpay-User-JWT)
+     * user_jwt가 없으면 헤더를 전송하지 않는다
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    private static function userJwtHeaders($userJwt = null, $idempotencyKey = null)
+    {
+        $headers = self::idempotencyHeaders($idempotencyKey);
+        if (isset($userJwt) && strlen($userJwt)) {
+            $headers[] = 'Bootpay-User-JWT: ' . $userJwt;
+        }
+        return $headers;
+    }
+
+    private static function supervisorHeaders($idempotencyKey = null)
+    {
+        $headers = self::idempotencyHeaders($idempotencyKey);
+        $headers[] = 'Bootpay-Role: supervisor';
+        return $headers;
+    }
+
+    /**
+     * null이 아닌 값만 query string으로 변환한다
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    private static function query($params)
+    {
+        $compacted = self::compact($params);
+        if (empty($compacted)) {
+            return '';
+        }
+        return '?' . http_build_query($compacted);
     }
 
     private static function compact($payload)
@@ -138,58 +178,205 @@ class BootpayCommerceApi
     }
 
     // Store
-    public static function getStore()
+    /**
+     * 가맹점 기본 정보를 조회한다 (GET /store)
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function getStore($idempotencyKey = null)
     {
-        return self::request('GET', 'store');
+        return self::request(
+            'GET',
+            'store',
+            null,
+            self::idempotencyHeaders($idempotencyKey)
+        );
     }
 
-    public static function storeInfo()
+    public static function storeInfo($idempotencyKey = null)
     {
-        return self::getStore();
+        return self::getStore($idempotencyKey);
     }
 
-    public static function getStoreDetail()
+    /**
+     * 가맹점 상세 정보를 조회한다 (GET /store/detail)
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function getStoreDetail($idempotencyKey = null)
     {
-        return self::request('GET', 'store/detail');
+        return self::request(
+            'GET',
+            'store/detail',
+            null,
+            self::idempotencyHeaders($idempotencyKey)
+        );
     }
 
-    public static function storeDetail()
+    public static function storeDetail($idempotencyKey = null)
     {
-        return self::getStoreDetail();
+        return self::getStoreDetail($idempotencyKey);
     }
 
     // User
-    public static function userLogin($loginId, $loginPw)
+    /**
+     * 회원 로그인 (POST /user/login)
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function userLogin($loginId, $password, $corporateType = 0, $idempotencyKey = null)
     {
-        return self::request('POST', 'users/login', array(
-            'login_id' => $loginId,
-            'login_pw' => $loginPw
+        return self::request(
+            'POST',
+            'user/login',
+            self::compact(array(
+                'login_id' => $loginId,
+                'password' => $password,
+                'corporate_type' => $corporateType
+            )),
+            self::idempotencyHeaders($idempotencyKey)
+        );
+    }
+
+    /**
+     * 회원 세션 조회 (GET /user/session)
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function userSession($userJwt = null, $idempotencyKey = null)
+    {
+        return self::request(
+            'GET',
+            'user/session',
+            null,
+            self::userJwtHeaders($userJwt, $idempotencyKey)
+        );
+    }
+
+    /**
+     * 회원 로그아웃 (DELETE /user/session)
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function userLogout($userJwt, $idempotencyKey = null)
+    {
+        return self::request(
+            'DELETE',
+            'user/session',
+            null,
+            self::userJwtHeaders($userJwt, $idempotencyKey)
+        );
+    }
+
+    /**
+     * 회원가입 (POST /user/join)
+     * 전달된 값(null이 아닌 값)만 서버로 전송되며, 별도로 전달한 확장 필드도 함께 전송된다.
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function userJoin($userParameters, $idempotencyKey = null)
+    {
+        !isset($userParameters) && $userParameters = array();
+        if (isset($userParameters['idempotency_key'])) {
+            $idempotencyKey = $userParameters['idempotency_key'];
+            unset($userParameters['idempotency_key']);
+        }
+        $payload = self::compact(array(
+            'login_id' => isset($userParameters['login_id']) ? $userParameters['login_id'] : null,
+            'password' => isset($userParameters['password']) ? $userParameters['password'] : null,
+            'name' => isset($userParameters['name']) ? $userParameters['name'] : null,
+            'email' => isset($userParameters['email']) ? $userParameters['email'] : null,
+            'phone' => isset($userParameters['phone']) ? $userParameters['phone'] : null,
+            'nickname' => isset($userParameters['nickname']) ? $userParameters['nickname'] : null,
+            'gender' => isset($userParameters['gender']) ? $userParameters['gender'] : null,
+            'birth' => isset($userParameters['birth']) ? $userParameters['birth'] : null,
+            'corporate_type' => isset($userParameters['corporate_type']) ? $userParameters['corporate_type'] : 0,
+            'group' => isset($userParameters['group']) ? $userParameters['group'] : null
         ));
+        foreach (self::compact($userParameters) as $key => $value) {
+            if (!array_key_exists($key, $payload)) {
+                $payload[$key] = $value;
+            }
+        }
+        return self::request(
+            'POST',
+            'user/join',
+            $payload,
+            self::idempotencyHeaders($idempotencyKey)
+        );
     }
 
-    public static function userJoin($user)
+    /**
+     * 회원가입 중복 확인 (GET /user/join/{type})
+     * type: email-exist, id-exist, phone-exist, group-business-number-exist
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function userJoinCheck($type, $pk, $idempotencyKey = null)
     {
-        return self::request('POST', 'users/join', $user);
-    }
-
-    public static function userJoinCheck($type, $pk)
-    {
-        return self::request('GET', 'users/join/' . $type . '?pk=' . urlencode($pk));
+        return self::request(
+            'GET',
+            'user/join/' . $type . self::query(array('pk' => $pk)),
+            null,
+            self::idempotencyHeaders($idempotencyKey)
+        );
     }
 
     // Product
+    /**
+     * 상품 목록을 조회한다 (GET /products)
+     * page, limit, category_id, sort, keyword를 전달할 수 있으며
+     * user_jwt, idempotency_key는 헤더로 전송된다.
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
     public static function products($params = array())
     {
-        $query = '';
-        if (!empty($params)) {
-            $query = '?' . http_build_query($params);
-        }
-        return self::request('GET', 'products' . $query);
+        !isset($params) && $params = array();
+        $userJwt = isset($params['user_jwt']) ? $params['user_jwt'] : null;
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['user_jwt'], $params['idempotency_key']);
+
+        $params = array_merge(
+            array('page' => 1, 'limit' => 20),
+            $params
+        );
+        return self::request(
+            'GET',
+            'products' . self::query($params),
+            null,
+            self::userJwtHeaders($userJwt, $idempotencyKey)
+        );
     }
 
-    public static function productDetail($productId)
+    /**
+     * 상품 상세를 조회한다 (GET /products/{product_id})
+     * Comment by GOSOMI
+     * @date: 2026-02-23
+     */
+    public static function productDetail($productId, $userJwt = null, $idempotencyKey = null)
     {
-        return self::request('GET', 'products/' . $productId);
+        return self::request(
+            'GET',
+            'products/' . $productId,
+            null,
+            self::userJwtHeaders($userJwt, $idempotencyKey)
+        );
+    }
+
+    /**
+     * 상품 정보를 가져온다 (GET /products/{product_id})
+     * Comment by GOSOMI
+     * @date: 2025-10-10
+     */
+    public static function lookupProduct($productId, $idempotencyKey = null)
+    {
+        return self::request(
+            'GET',
+            'products/' . $productId,
+            null,
+            self::idempotencyHeaders($idempotencyKey)
+        );
     }
 
     // Mall Setting

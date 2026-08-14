@@ -115,6 +115,23 @@ class BootpayApi
     }
 
     /**
+     * client key가 설정되어 있으면 basic authentication을 사용하고,
+     * 그렇지 않은 경우에만 access token을 발급받는다
+     * Comment by GOSOMI
+     * @date: 2026-03-11
+     */
+    public static function basicOrGetAccessToken()
+    {
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            return (object)array(
+                'status' => 200,
+                'message' => 'basic authentication을 사용합니다.'
+            );
+        }
+        return self::getAccessToken();
+    }
+
+    /**
      * Lookup Receipt Payment
      * Comment by GOSOMI
      */
