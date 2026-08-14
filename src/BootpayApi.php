@@ -198,6 +198,19 @@ class BootpayApi
         );
     }
 
+    /**
+     * 우선순위 빌링키 조회
+     * Comment by GOSOMI
+     * @date: 2026-07-03
+     */
+    public static function lookupSequentialBillingKey($widgetKey, $billingKey)
+    {
+        return self::request(
+            'GET',
+            sprintf('subscribe/sequential_billing_key/%s?widget_key=%s', $billingKey, $widgetKey)
+        );
+    }
+
 
 
     /**
