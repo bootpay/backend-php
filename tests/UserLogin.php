@@ -1,7 +1,7 @@
 <?php
 /*
  * 회원 로그인 / 세션 조회 / 로그아웃 예제입니다.
- * POST user/login, GET user/session, DELETE user/session
+ * POST users/login, GET users/session, DELETE users/session
  */
 require_once '../vendor/autoload.php';
 // require_once __DIR__.'/../src/BootpayCommerceApi.php';
@@ -15,7 +15,7 @@ BootpayCommerceApi::setConfiguration(
 );
 
 try {
-    // POST user/login
+    // POST users/login
     $login = BootpayCommerceApi::userLogin(
         'test@bootpay.co.kr',
         'test1234!',
@@ -25,11 +25,11 @@ try {
 
     $userJwt = isset($login->data->token) ? $login->data->token : null;
 
-    // GET user/session
+    // GET users/session
     $session = BootpayCommerceApi::userSession($userJwt);
     var_dump($session);
 
-    // DELETE user/session
+    // DELETE users/session
     $logout = BootpayCommerceApi::userLogout($userJwt);
     var_dump($logout);
 } catch (Exception $e) {

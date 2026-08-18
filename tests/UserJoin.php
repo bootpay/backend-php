@@ -1,7 +1,7 @@
 <?php
 /*
  * 회원가입 / 회원가입 중복확인 예제입니다.
- * POST user/join, GET user/join/{type}?pk={pk}
+ * POST users/join, GET users/join/{type}?pk={pk}
  */
 require_once '../vendor/autoload.php';
 // require_once __DIR__.'/../src/BootpayCommerceApi.php';
@@ -15,12 +15,12 @@ BootpayCommerceApi::setConfiguration(
 );
 
 try {
-    // GET user/join/id-exist?pk=test@bootpay.co.kr
-    // type: email-exist, id-exist, phone-exist, group-business-number-exist
+    // GET users/join/id-exist?pk=test@bootpay.co.kr
+    // type: email-exist, id-exist, phone-exist, uid-exist, group-business-number-exist
     $exist = BootpayCommerceApi::userJoinCheck('id-exist', 'test@bootpay.co.kr');
     var_dump($exist);
 
-    // POST user/join (전달한 값만 서버로 전송됩니다)
+    // POST users/join (전달한 값만 서버로 전송됩니다)
     $join = BootpayCommerceApi::userJoin(array(
         'login_id' => 'test@bootpay.co.kr',
         'password' => 'test1234!',
@@ -33,6 +33,10 @@ try {
         'corporate_type' => 0
     ));
     var_dump($join);
+
+    // GET users/join/uid-exist?pk=ex_user_0001 (외부 uid 중복검사 전용형)
+    $uidExist = BootpayCommerceApi::uidExist('ex_user_0001');
+    var_dump($uidExist);
 } catch (Exception $e) {
     echo($e->getMessage());
 }

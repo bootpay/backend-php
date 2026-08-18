@@ -219,12 +219,18 @@ class BootpayApi
      * 우선순위 빌링키 조회
      * Comment by GOSOMI
      * @date: 2026-07-03
+     * @date: 2026-08-18 user_id 파라미터 추가 (회원 단위로 우선순위 빌링키를 조회한다)
+     *        기존 호출과의 하위호환을 위해 user_id를 전달하지 않으면 쿼리에 포함하지 않는다
      */
-    public static function lookupSequentialBillingKey($widgetKey, $billingKey)
+    public static function lookupSequentialBillingKey($widgetKey, $billingKey, $userId = null)
     {
+        $query = array('widget_key' => $widgetKey);
+        if (isset($userId) && strlen($userId)) {
+            $query['user_id'] = $userId;
+        }
         return self::request(
             'GET',
-            sprintf('subscribe/sequential_billing_key/%s?widget_key=%s', $billingKey, $widgetKey)
+            sprintf('subscribe/sequential_billing_key/%s?%s', $billingKey, http_build_query($query))
         );
     }
 
