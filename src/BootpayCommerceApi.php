@@ -17,6 +17,8 @@ use Bootpay\ServerPhp\Commerce\CategoryModule;
 use Bootpay\ServerPhp\Commerce\CouponModule;
 use Bootpay\ServerPhp\Commerce\PointModule;
 use Bootpay\ServerPhp\Commerce\CartModule;
+use Bootpay\ServerPhp\Commerce\MallSettingModule;
+use Bootpay\ServerPhp\Commerce\WebhookModule;
 
 class BootpayCommerceApi
 {
@@ -33,8 +35,8 @@ class BootpayCommerceApi
     );
 
     private static $postMethods = array('POST', 'PUT');
-    private static $apiVersion = '2.4.1';
-    private static $sdkVersion = '2.4.1';
+    private static $apiVersion = '2.5.0';
+    private static $sdkVersion = '2.5.0';
 
     public $user;
     public $userGroup;
@@ -51,6 +53,8 @@ class BootpayCommerceApi
     public $coupon;
     public $point;
     public $cart;
+    public $mallSetting;
+    public $webhook;
 
     public function __construct($clientKey = null, $secretKey = null, $mode = 'production')
     {
@@ -77,6 +81,8 @@ class BootpayCommerceApi
         $this->coupon = new CouponModule($this);
         $this->point = new PointModule($this);
         $this->cart = new CartModule($this);
+        $this->mallSetting = new MallSettingModule($this);
+        $this->webhook = new WebhookModule($this);
     }
 
     public function setConfiguration($clientKey, $secretKey, $mode = 'production')
@@ -186,7 +192,53 @@ class BootpayCommerceApi
             $defaultHeaders[] = 'Authorization: ' . $basicAuth;
         }
 
-        return array_merge($defaultHeaders, $headers);
+        return $this->mergeHeaders($defaultHeaders, $headers);
+    }
+
+    /**
+     * 요청별 헤더가 기본 헤더와 같은 이름이면 기본 헤더를 제거하고 요청별 값을 유지한다.
+     * (supervisor 전용 endpoint 의 BOOTPAY-ROLE 이 기본 role 과 중복 전송되는 것을 방지)
+     */
+    private function mergeHeaders($defaultHeaders, $headers)
+    {
+        if (empty($headers)) {
+            return $defaultHeaders;
+        }
+
+        $overridden = array();
+        foreach ($headers as $header) {
+            $pos = strpos($header, ':');
+            if ($pos === false) {
+                continue;
+            }
+            $overridden[strtolower(trim(substr($header, 0, $pos)))] = true;
+        }
+
+        $merged = array();
+        foreach ($defaultHeaders as $header) {
+            $pos = strpos($header, ':');
+            $name = $pos === false ? '' : strtolower(trim(substr($header, 0, $pos)));
+            if ($name === '' || !isset($overridden[$name])) {
+                $merged[] = $header;
+            }
+        }
+
+        return array_merge($merged, $headers);
+    }
+
+    /**
+     * Idempotency-Key 헤더용 uuid v4 생성
+     */
+    public static function generateIdempotencyKey()
+    {
+        if (function_exists('random_bytes')) {
+            $bytes = random_bytes(16);
+        } else {
+            $bytes = openssl_random_pseudo_bytes(16);
+        }
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 
     public function request($method, $url, $data = null, $headers = null, $useBasicAuth = false)
@@ -211,7 +263,7 @@ class BootpayCommerceApi
 
         if (in_array($method, array('DELETE', 'PUT'))) {
             curl_setopt($channel, CURLOPT_CUSTOMREQUEST, $method);
-            if ($data !== null && $method === 'PUT') {
+            if ($data !== null) {
                 curl_setopt($channel, CURLOPT_POSTFIELDS, json_encode($data));
             }
         }
@@ -252,6 +304,12 @@ class BootpayCommerceApi
             $multipartHeaders[] = 'Authorization: ' . $basicAuth;
         }
 
+        // ⚠️ Content-Type 은 지정하지 않는다 — curl 이 붙이는 multipart boundary 가 유실되면
+        // 서버가 본문을 null 로 읽는다. 요청별 헤더(Idempotency-Key, BOOTPAY-ROLE 등)만 병합한다.
+        if (!empty($headers)) {
+            $multipartHeaders = $this->mergeHeaders($multipartHeaders, $headers);
+        }
+
         curl_setopt($channel, CURLOPT_HTTPHEADER, $multipartHeaders);
         curl_setopt($channel, CURLOPT_POST, true);
 
@@ -261,6 +319,10 @@ class BootpayCommerceApi
             foreach ($data as $key => $value) {
                 if (is_array($value) || is_object($value)) {
                     $postData[$key] = json_encode($value);
+                } elseif (is_bool($value)) {
+                    // curl 은 bool 을 true→"1", false→"" 로 보내 false 가 서버에서 nil 로 읽힌다.
+                    // NodeJS SDK 의 String(bool) 과 동일하게 'true'/'false' 문자열로 전송한다.
+                    $postData[$key] = $value ? 'true' : 'false';
                 } else {
                     $postData[$key] = $value;
                 }
@@ -311,9 +373,15 @@ class BootpayCommerceApi
         return $this->request('PUT', $url, $data, $headers);
     }
 
-    public function delete($url, $headers = null)
+    /**
+     * DELETE 요청
+     * @param string $url
+     * @param array|null $headers
+     * @param array|object|null $data DELETE body 가 필요한 endpoint 용 (예: order_subscriptions/charge)
+     */
+    public function delete($url, $headers = null, $data = null)
     {
-        return $this->request('DELETE', $url, null, $headers);
+        return $this->request('DELETE', $url, $data, $headers);
     }
 
     /**

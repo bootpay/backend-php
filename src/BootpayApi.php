@@ -199,6 +199,25 @@ class BootpayApi
     }
 
     /**
+     * Lookup Sequential Billing Key
+     * 우선순위(순차) 결제 빌링키 조회
+     * @param string $widgetKey
+     * @param string $billingKey
+     * @param string $userId 조회 대상 회원 ID (서버가 빌링키 소유자 검증에 사용한다)
+     */
+    public static function lookupSequentialBillingKey($widgetKey, $billingKey, $userId)
+    {
+        // RFC3986 인코딩 — NodeJS SDK 의 encodeURIComponent 와 동일한 wire 포맷 (공백을 + 가 아닌 %20 으로)
+        return self::request(
+            'GET',
+            'subscribe/sequential_billing_key/' . $billingKey . '?' . http_build_query(array(
+                'widget_key' => $widgetKey,
+                'user_id' => $userId
+            ), '', '&', PHP_QUERY_RFC3986)
+        );
+    }
+
+    /**
      * Request Billing Key
      * Comment by GOSOMI
      * @throws \Exception

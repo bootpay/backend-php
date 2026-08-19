@@ -82,8 +82,13 @@ class UserGroupModule
     }
 
     /**
-     * 그룹 제한 설정
-     * @param array $params 제한 설정 파라미터
+     * 그룹 구매한도 설정 (manager 전용)
+     * PUT /v1/user-groups/{user_group_id}/limit
+     * ⚠️ update 로는 한도가 절대 반영되지 않는다 — 서버 user_groups_controller#update 가
+     *    use_limit / limit_message / limit_month_purchase / limit_week_purchase 를 명시적으로 제거하기 때문이다.
+     *    한도는 이 전용 라우트로만 바뀐다.
+     * @param array $params 제한 설정 파라미터 (user_group_id 필수 / use_limit, limit_message,
+     *                      limit_month_purchase, limit_week_purchase / idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      * @throws \Exception
      */
@@ -93,12 +98,20 @@ class UserGroupModule
             throw new \Exception('user_group_id is required');
         }
         $userGroupId = $params['user_group_id'];
-        return $this->bootpay->put("user-groups/{$userGroupId}/limit", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['user_group_id'], $params['idempotency_key']);
+        return $this->bootpay->put(
+            "user-groups/{$userGroupId}/limit",
+            $this->compact($params),
+            $this->managerHeaders($idempotencyKey)
+        );
     }
 
     /**
-     * 그룹 거래 집계 조회
-     * @param array $params 집계 파라미터
+     * 그룹 구독 합산청구(정산주기) 설정 변경 (manager 전용)
+     * PUT /v1/user-groups/{user_group_id}/aggregate-transaction
+     * update 에도 같은 이름의 인자가 있지만 서버는 이 전용 라우트에서만 처리한다.
+     * @param array $params 집계 파라미터 (user_group_id 필수 / idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      * @throws \Exception
      */
@@ -108,7 +121,40 @@ class UserGroupModule
             throw new \Exception('user_group_id is required');
         }
         $userGroupId = $params['user_group_id'];
-        return $this->bootpay->put("user-groups/{$userGroupId}/aggregate-transaction", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['user_group_id'], $params['idempotency_key']);
+        return $this->bootpay->put(
+            "user-groups/{$userGroupId}/aggregate-transaction",
+            $this->compact($params),
+            $this->managerHeaders($idempotencyKey)
+        );
+    }
+
+    /**
+     * null 값을 제거한다. (NodeJS SDK 의 compact 와 동일 동작)
+     */
+    private function compact($payload)
+    {
+        $result = array();
+        foreach ((array)$payload as $key => $value) {
+            if ($value !== null) {
+                $result[$key] = $value;
+            }
+        }
+        // 빈 배열은 JSON 인코딩 시 [] 가 되므로 {} 로 전송되도록 객체로 변환
+        return empty($result) ? new \stdClass() : $result;
+    }
+
+    /**
+     * 그룹 한도/합산청구 설정 요청 헤더 — 서버가 manager scope 를 요구한다.
+     * Idempotency-Key 는 미지정시 매 호출마다 생성된다.
+     */
+    private function managerHeaders($idempotencyKey = null)
+    {
+        return array(
+            'Idempotency-Key: ' . ($idempotencyKey ?: BootpayCommerceApi::generateIdempotencyKey()),
+            'BOOTPAY-ROLE: manager'
+        );
     }
 
     private function buildQueryString($params)

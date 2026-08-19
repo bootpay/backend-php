@@ -72,11 +72,29 @@ class TestConfig extends TestCase
     }
 
     /**
+     * 라이브 테스트 가드 — BOOTPAY_ENV=development 가 아니면 skip 한다 (production 호출 방지).
+     * 로컬 echo 서버로 리다이렉트된 실행(tests/echo-suite-bootstrap.php)은
+     * BOOTPAY_TEST_ECHO=1 로 우회한다 (외부 요청이 원천 차단된 상태라 안전).
+     */
+    protected static function requireLiveEnvironment(): void
+    {
+        if (getenv('BOOTPAY_TEST_ECHO')) {
+            return;
+        }
+        if (self::getEnv() !== 'development') {
+            static::markTestSkipped(
+                'live test skipped: BOOTPAY_ENV=development 에서만 실행합니다 (production 호출 금지). 현재: ' . self::getEnv()
+            );
+        }
+    }
+
+    /**
      * Configure PG API with appropriate keys (read from .env / environment variables).
      * BOOTPAY_AUTH_MODE 에 따라 ck/sk (default) 또는 legacy application_id/private_key 사용.
      */
     protected static function setupPgApi(): void
     {
+        self::requireLiveEnvironment();
         if (self::getAuthMode() === 'legacy') {
             self::setupPgApiLegacy();
             return;
@@ -118,6 +136,7 @@ class TestConfig extends TestCase
      */
     protected static function setupPgApiLegacy(): void
     {
+        self::requireLiveEnvironment();
         $env = self::getEnv();
         echo "[BOOTPAY_AUTH_MODE=legacy] PG: application_id/private_key (Bearer) | env={$env}" . PHP_EOL;
         if ($env === 'production') {
@@ -140,6 +159,7 @@ class TestConfig extends TestCase
      */
     protected static function createCommerceApi(): BootpayCommerceApi
     {
+        self::requireLiveEnvironment();
         $env = self::getEnv();
         if ($env === 'production') {
             return new BootpayCommerceApi(

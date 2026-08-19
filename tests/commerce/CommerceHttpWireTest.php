@@ -1,0 +1,219 @@
+<?php
+
+namespace Bootpay\ServerPhp\Test\Commerce;
+
+use Bootpay\ServerPhp\BootpayCommerceApi;
+use Bootpay\ServerPhp\Test\WireEchoTestCase;
+use ReflectionProperty;
+
+require_once __DIR__ . '/../WireEchoTestCase.php';
+
+/**
+ * Commerce 공통 계층(curl)이 실제로 전송하는 wire 검증 — 로컬 echo 서버 사용, 외부 호출 없음.
+ * mock(CommerceWireFormatTest)이 못 보는 영역을 커버한다:
+ * 최종 헤더 병합 결과, DELETE body 실전송, multipart boundary 유지와 images[n] 인덱싱.
+ */
+class CommerceHttpWireTest extends WireEchoTestCase
+{
+    /** @var array 원본 API_URL (테스트 후 복원) */
+    private static $originalApiUrl;
+
+    /** @var BootpayCommerceApi */
+    private $api;
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+        $prop = self::apiUrlProperty();
+        self::$originalApiUrl = $prop->getValue();
+        $redirected = self::$originalApiUrl;
+        $redirected['development'] = self::echoServerUrl('/v1');
+        $prop->setValue(null, $redirected);
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        self::apiUrlProperty()->setValue(null, self::$originalApiUrl);
+        parent::tearDownAfterClass();
+    }
+
+    private static function apiUrlProperty()
+    {
+        $prop = new ReflectionProperty(BootpayCommerceApi::class, 'API_URL');
+        if (PHP_VERSION_ID < 80100) {
+            $prop->setAccessible(true);
+        }
+        return $prop;
+    }
+
+    protected function setUp(): void
+    {
+        $this->api = new BootpayCommerceApi('ck', 'sk', 'development');
+    }
+
+    public function testDefaultRequestSendsBasicAuthAndUserRole()
+    {
+        $res = $this->api->user->getList();
+
+        $this->assertEquals('GET', $res->method);
+        $this->assertEquals('/v1/users', $res->uri);
+        $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
+        $this->assertEquals('user', self::echoHeader($res, 'BOOTPAY-ROLE'));
+        $this->assertEquals('application/json', self::echoHeader($res, 'Content-Type'));
+        $this->assertEquals('2.5.0', self::echoHeader($res, 'BOOTPAY-SDK-VERSION'));
+        $this->assertEquals('303', self::echoHeader($res, 'BOOTPAY-SDK-TYPE'));
+    }
+
+    public function testRequestScopedSupervisorRoleWinsOnTheWire()
+    {
+        $res = $this->api->mallSetting->getMallSetting('ms-key');
+
+        $this->assertEquals('/v1/mall-setting', $res->uri);
+        $this->assertEquals('supervisor', self::echoHeader($res, 'BOOTPAY-ROLE'));
+        $this->assertEquals('ms-key', self::echoHeader($res, 'Idempotency-Key'));
+    }
+
+    public function testChargeRevokeTransmitsDeleteBody()
+    {
+        $res = $this->api->orderSubscription->supervisorChargeRevoke(array('charge_key' => 'ckey-1'));
+
+        $this->assertEquals('DELETE', $res->method);
+        $this->assertEquals('/v1/order_subscriptions/charge', $res->uri);
+        $this->assertEquals(array('charge_key' => 'ckey-1'), json_decode($res->raw_body, true));
+        $this->assertEquals('supervisor', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
+    public function testAdjustmentDeleteTransmitsIdInBodyNotQuery()
+    {
+        $res = $this->api->orderSubscriptionAdjustment->delete('os-1', 'adj-1');
+
+        $this->assertEquals('DELETE', $res->method);
+        $this->assertEquals('/v1/order_subscriptions/os-1/adjustments', $res->uri);
+        $this->assertEquals(array('order_subscription_adjustment_id' => 'adj-1'), json_decode($res->raw_body, true));
+    }
+
+    public function testUserGroupLimitTransmitsPurchaseLimits()
+    {
+        $res = $this->api->userGroup->limit(array(
+            'user_group_id' => 'ug-1',
+            'use_limit' => true,
+            'limit_month_purchase' => 100000,
+            'limit_week_purchase' => 30000
+        ));
+
+        $this->assertEquals('PUT', $res->method);
+        $this->assertEquals('/v1/user-groups/ug-1/limit', $res->uri);
+        $this->assertEquals(
+            array('use_limit' => true, 'limit_month_purchase' => 100000, 'limit_week_purchase' => 30000),
+            json_decode($res->raw_body, true)
+        );
+        $this->assertEquals('manager', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
+    public function testProductCreateWithoutImagesTransmitsJson()
+    {
+        $res = $this->api->product->create(array('name' => '상품', 'display_price' => 1000, 'memo' => null));
+
+        $this->assertEquals('POST', $res->method);
+        $this->assertEquals('/v1/products', $res->uri);
+        $this->assertEquals('application/json', self::echoHeader($res, 'Content-Type'));
+        $this->assertEquals(array('name' => '상품', 'display_price' => 1000), json_decode($res->raw_body, true));
+        $this->assertEquals('manager', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
+    public function testProductCreateWithImagesTransmitsMultipartWithBoundaryAndIndexedImages()
+    {
+        $dir = sys_get_temp_dir() . '/bootpay-php-wire-' . uniqid();
+        mkdir($dir);
+        file_put_contents($dir . '/img0.png', 'png-0');
+        file_put_contents($dir . '/img1.png', 'png-1');
+
+        try {
+            $res = $this->api->product->create(
+                array('name' => '상품', 'display_price' => 1000, 'option' => array('color' => 'red')),
+                array($dir . '/img0.png', $dir . '/img1.png'),
+                'pc-key'
+            );
+
+            $this->assertEquals('POST', $res->method);
+            $this->assertEquals('/v1/products', $res->uri);
+
+            // boundary 가 유실되면 서버가 본문을 null 로 읽는다
+            $contentType = self::echoHeader($res, 'Content-Type');
+            $this->assertStringStartsWith('multipart/form-data', $contentType);
+            $this->assertStringContainsString('boundary=', $contentType);
+
+            // 필드는 문자열/JSON 문자열로, 이미지는 images[0], images[1] ... 인덱싱으로 전송된다
+            $post = (array)$res->post;
+            $this->assertEquals('상품', $post['name']);
+            $this->assertEquals('1000', $post['display_price']);
+            $this->assertEquals(array('color' => 'red'), json_decode($post['option'], true));
+
+            $images = (array)$res->files->images;
+            $this->assertCount(2, $images);
+            $this->assertArrayHasKey(0, $images);
+            $this->assertArrayHasKey(1, $images);
+
+            $this->assertEquals('manager', self::echoHeader($res, 'BOOTPAY-ROLE'));
+            $this->assertEquals('pc-key', self::echoHeader($res, 'Idempotency-Key'));
+            $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
+        } finally {
+            @unlink($dir . '/img0.png');
+            @unlink($dir . '/img1.png');
+            @rmdir($dir);
+        }
+    }
+
+    public function testProductCreateMultipartSerializesBooleansAsLowercaseStrings()
+    {
+        $dir = sys_get_temp_dir() . '/bootpay-php-wire-' . uniqid();
+        mkdir($dir);
+        file_put_contents($dir . '/img0.png', 'png-0');
+
+        try {
+            $res = $this->api->product->create(
+                array('name' => '상품', 'use_stock' => true, 'is_hidden' => false),
+                array($dir . '/img0.png')
+            );
+
+            // curl 기본 직렬화(true→"1", false→"")면 false 가 서버에서 nil 로 읽힌다 —
+            // nodejs String(bool) 과 동일한 'true'/'false' 문자열로 도착해야 한다
+            $post = (array)$res->post;
+            $this->assertSame('true', $post['use_stock']);
+            $this->assertSame('false', $post['is_hidden']);
+        } finally {
+            @unlink($dir . '/img0.png');
+            @rmdir($dir);
+        }
+    }
+
+    public function testInvoiceListTransmitsDefaultLimit24()
+    {
+        $res = $this->api->invoice->getList(array('cs_type' => 'month'));
+
+        $this->assertEquals('/v1/invoices?page=1&limit=24&cs_type=month', $res->uri);
+        $this->assertEquals('user', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
+    public function testOrderCancelApproveLegacyArgumentStillWorksOnTheWire()
+    {
+        $res = $this->api->orderCancel->approve(array(
+            'order_cancel_request_history_id' => 'ocr-legacy',
+            'message' => '승인'
+        ));
+
+        $this->assertEquals('PUT', $res->method);
+        $this->assertEquals('/v1/order/cancel/ocr-legacy/approve', $res->uri);
+        $this->assertEquals(array('message' => '승인'), json_decode($res->raw_body, true));
+        $this->assertEquals('supervisor', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
+    public function testMallUserSessionTransmitsJwtHeader()
+    {
+        $res = $this->api->user->userSession('jwt-1');
+
+        $this->assertEquals('GET', $res->method);
+        $this->assertEquals('/v1/users/session', $res->uri);
+        $this->assertEquals('jwt-1', self::echoHeader($res, 'Bootpay-User-JWT'));
+    }
+}

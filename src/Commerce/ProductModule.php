@@ -25,14 +25,74 @@ class ProductModule
     }
 
     /**
-     * 상품 생성 (이미지 포함)
-     * @param array $product 상품 정보
-     * @param array|null $imagePaths 이미지 파일 경로 배열
+     * 상품 목록 조회 (V1 Mall API)
+     * GET /v1/products
+     * page/limit 은 미지정시 각각 1 / 20 이 적용되고, 나머지 값은 지정된 것만 전송한다.
+     * ⚠️ keyword 는 서버(v1/products_controller#index)가 읽지 않는다 — page/limit/category_id/ex_uid/sort 만 사용하며
+     *    keyword 를 보내도 조용히 무시된다. 하위호환 때문에 인자는 남겨두되, 검색이 필요하면 서버 지원이 선행되어야 한다.
+     * @param array|null $params 조회 파라미터 (user_jwt 는 Bootpay-User-JWT 헤더,
+     *                           idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
-    public function create($product, $imagePaths = null)
+    public function products($params = null)
     {
-        return $this->bootpay->requestMultipart('POST', 'products', $product, $imagePaths);
+        $params = $params === null ? array() : $params;
+        $userJwt = isset($params['user_jwt']) ? $params['user_jwt'] : null;
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['user_jwt'], $params['idempotency_key']);
+
+        $query = array(
+            'page' => isset($params['page']) ? $params['page'] : 1,
+            'limit' => isset($params['limit']) ? $params['limit'] : 20
+        );
+        if (isset($params['category_id'])) {
+            $query['category_id'] = $params['category_id'];
+        }
+        if (isset($params['sort'])) {
+            $query['sort'] = $params['sort'];
+        }
+        if (isset($params['keyword'])) {
+            $query['keyword'] = $params['keyword'];
+        }
+        if (isset($params['type'])) {
+            $query['type'] = $params['type'];
+        }
+        if (isset($params['period_type'])) {
+            $query['period_type'] = $params['period_type'];
+        }
+        if (isset($params['s_at'])) {
+            $query['s_at'] = $params['s_at'];
+        }
+        if (isset($params['e_at'])) {
+            $query['e_at'] = $params['e_at'];
+        }
+        if (isset($params['category_code'])) {
+            $query['category_code'] = $params['category_code'];
+        }
+
+        $queryString = http_build_query($query);
+        return $this->bootpay->get("products?{$queryString}", $this->mallHeaders($userJwt, $idempotencyKey));
+    }
+
+    /**
+     * 상품 생성 (manager 전용)
+     * POST /v1/products
+     * $imagePaths 가 있으면 multipart/form-data (images[0], images[1] ... 인덱싱), 없으면 JSON 으로 보낸다.
+     * @param array $product 상품 정보 (여기 명시되지 않은 값도 서버 _product_params 로 그대로 전달된다)
+     * @param array|null $imagePaths 이미지 파일 경로 배열
+     * @param string|null $idempotencyKey 미지정시 자동 생성
+     * @return object
+     */
+    public function create($product, $imagePaths = null, $idempotencyKey = null)
+    {
+        $payload = $this->compact($product);
+        $headers = $this->managerHeaders($idempotencyKey);
+
+        if ($imagePaths === null || count($imagePaths) === 0) {
+            return $this->bootpay->post('products', $payload, $headers);
+        }
+
+        return $this->bootpay->requestMultipart('POST', 'products', $payload, $imagePaths, $headers);
     }
 
     /**
@@ -46,23 +106,45 @@ class ProductModule
     }
 
     /**
-     * 상품 수정
-     * @param array $product 상품 정보
+     * 상품 상세 조회 (V1 Mall API)
+     * GET /v1/products/{product_id}
+     * @param string $productId 상품 ID
+     * @param string|null $userJwt 회원 JWT (선택)
+     * @param string|null $idempotencyKey 미지정시 자동 생성
+     * @return object
+     */
+    public function productDetail($productId, $userJwt = null, $idempotencyKey = null)
+    {
+        return $this->bootpay->get("products/{$productId}", $this->mallHeaders($userJwt, $idempotencyKey));
+    }
+
+    /**
+     * 상품 수정 (manager 전용)
+     * PUT /v1/products/{product_id}
+     * 바뀐 값만 보내면 된다. ⚠️ category_id 는 키 존재 여부로 '해제 의사'를 판별하므로 주의.
+     * @param array $product 상품 정보 (product_id 필수)
+     * @param string|null $idempotencyKey 미지정시 자동 생성
      * @return object
      * @throws \Exception
      */
-    public function update($product)
+    public function update($product, $idempotencyKey = null)
     {
         if (!isset($product['product_id']) || empty($product['product_id'])) {
             throw new \Exception('product_id is required');
         }
         $productId = $product['product_id'];
-        return $this->bootpay->put("products/{$productId}", $product);
+        return $this->bootpay->put(
+            "products/{$productId}",
+            $this->compact($product),
+            $this->managerHeaders($idempotencyKey)
+        );
     }
 
     /**
-     * 상품 상태 변경
-     * @param array $params 상태 변경 파라미터
+     * 상품 판매/노출 상태 변경 (manager 전용)
+     * PUT /v1/products/{product_id}/status
+     * ⚠️ 재고(stock)는 여기가 아니라 update 로 바꾼다.
+     * @param array $params 상태 변경 파라미터 (product_id 필수 / idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      * @throws \Exception
      */
@@ -72,17 +154,67 @@ class ProductModule
             throw new \Exception('product_id is required');
         }
         $productId = $params['product_id'];
-        return $this->bootpay->put("products/{$productId}/status", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['product_id'], $params['idempotency_key']);
+        return $this->bootpay->put(
+            "products/{$productId}/status",
+            $this->compact($params),
+            $this->managerHeaders($idempotencyKey)
+        );
     }
 
     /**
-     * 상품 삭제
+     * 상품 삭제 (manager 전용)
+     * DELETE /v1/products/{product_id}
      * @param string $productId 상품 ID
+     * @param string|null $idempotencyKey 미지정시 자동 생성
      * @return object
      */
-    public function delete($productId)
+    public function delete($productId, $idempotencyKey = null)
     {
-        return $this->bootpay->delete("products/{$productId}");
+        return $this->bootpay->delete("products/{$productId}", $this->managerHeaders($idempotencyKey));
+    }
+
+    /**
+     * 상품 쓰기(등록/수정/삭제/상태변경) 요청 헤더
+     * 서버가 manager scope 를 요구한다.
+     */
+    private function managerHeaders($idempotencyKey = null)
+    {
+        return array(
+            'Idempotency-Key: ' . ($idempotencyKey ?: BootpayCommerceApi::generateIdempotencyKey()),
+            'BOOTPAY-ROLE: manager'
+        );
+    }
+
+    /**
+     * V1 Mall API 요청 헤더
+     * Idempotency-Key 는 미지정시 매 호출마다 생성되고, Bootpay-User-JWT 는 값이 있을 때만 붙는다.
+     */
+    private function mallHeaders($userJwt = null, $idempotencyKey = null)
+    {
+        $headers = array(
+            'Idempotency-Key: ' . ($idempotencyKey ?: BootpayCommerceApi::generateIdempotencyKey())
+        );
+        if ($userJwt !== null && $userJwt !== '') {
+            $headers[] = 'Bootpay-User-JWT: ' . $userJwt;
+        }
+        return $headers;
+    }
+
+    /**
+     * null 값을 제거한다. (NodeJS SDK 의 compact 와 동일 동작)
+     */
+    private function compact($payload)
+    {
+        $result = array();
+        foreach ((array)$payload as $key => $value) {
+            if ($value !== null) {
+                $result[$key] = $value;
+            }
+        }
+        // 빈 배열은 JSON 인코딩 시 [] 가 되므로 {} 로 전송되도록 객체로 변환
+        return empty($result) ? new \stdClass() : $result;
     }
 
     private function buildQueryString($params)

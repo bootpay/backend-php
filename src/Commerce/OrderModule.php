@@ -74,6 +74,12 @@ class OrderModule
         if (isset($params['cs_type'])) {
             $query['cs_type'] = $params['cs_type'];
         }
+        if (isset($params['search_date_from'])) {
+            $query['search_date_from'] = $params['search_date_from'];
+        }
+        if (isset($params['search_date_to'])) {
+            $query['search_date_to'] = $params['search_date_to'];
+        }
         if (isset($params['css_at'])) {
             $query['css_at'] = $params['css_at'];
         }
