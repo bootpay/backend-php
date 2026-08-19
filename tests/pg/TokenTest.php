@@ -13,18 +13,17 @@ class TokenTest extends TestConfig
         // BOOTPAY_AUTH_MODE 토글과 무관하게 ck/sk 동작을 검증해야 하므로 직접 setClientKeyConfiguration 호출.
         $env = self::getEnv();
         if ($env === 'production') {
-            BootpayApi::setClientKeyConfiguration(
-                \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_CLIENT_KEY_PROD', ''),
-                \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_SECRET_KEY_PROD', ''),
-                'production'
-            );
+            $clientKey = \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_CLIENT_KEY_PROD', '');
+            $secretKey = \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_SECRET_KEY_PROD', '');
         } else {
-            BootpayApi::setClientKeyConfiguration(
-                \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_CLIENT_KEY_DEV', ''),
-                \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_SECRET_KEY_DEV', ''),
-                'development'
-            );
+            $clientKey = \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_CLIENT_KEY_DEV', '');
+            $secretKey = \Bootpay\ServerPhp\Test\bootpayEnv('BOOTPAY_PG_SECRET_KEY_DEV', '');
         }
+        // 빈 ck/sk 는 getAccessToken 이 legacy 분기로 빠져 실서버 request/token 을 호출한다 — 키 없으면 skip.
+        if ($clientKey === '' || $secretKey === '') {
+            $this->markTestSkipped('PG client_key/secret_key 미설정 — 합성 응답 경로 검증 불가');
+        }
+        BootpayApi::setClientKeyConfiguration($clientKey, $secretKey, $env === 'production' ? 'production' : 'development');
 
         $response = BootpayApi::getAccessToken();
         $this->printResponse('PG getAccessToken (ck/sk)', $response);
