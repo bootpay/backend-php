@@ -16,8 +16,6 @@ class BootpayApi
         'production' => 'https://api.bootpay.co.kr/v2'
     );
     private static $postMethods = array('POST', 'PUT');
-    private static $apiVersion = '5.0.0';
-    private static $sdkVersion = '2.1.1';
 
     private static function entrypoints($url)
     {
@@ -30,27 +28,28 @@ class BootpayApi
         return implode("\r\n", $headers);
     }
 
+    private static function authorizationHeader()
+    {
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            return 'Basic ' . base64_encode(self::$clientKey . ':' . self::$secretKey);
+        }
+        return strlen(self::$token) ? 'Bearer ' . self::$token : null;
+    }
+
     private static function createHeaders($headers = null)
     {
         !isset($headers) && $headers = array();
+        $merged = array_merge($headers, array(
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ));
 
-        $auth = null;
-        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
-            $auth = 'Basic ' . base64_encode(self::$clientKey . ':' . self::$secretKey);
-        } else if (strlen(self::$applicationId)) {
-            if (strlen(self::$token)) {
-                $auth = 'Bearer ' . self::$token;
-            }
+        $authorization = self::authorizationHeader();
+        if (isset($authorization) && strlen($authorization)) {
+            $merged[] = 'Authorization: ' . $authorization;
         }
 
-        return array_merge($headers, array(
-            'Content-Type: application/json',
-            'Accept: application/json',
-            'Authorization: ' . $auth,
-            'BOOTPAY-API-VERSION: ' . self::$apiVersion,
-            'BOOTPAY-SDK-VERSION: ' . self::$sdkVersion,
-            'BOOTPAY-SDK-TYPE: 303'
-        ));
+        return $merged;
     }
 
     private static function request($method, $url, $data = null, $headers = null)
@@ -74,7 +73,6 @@ class BootpayApi
         if ($errno) {
             throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
         }
-        curl_close($channel);
         $json = json_decode(trim($response));
         return $json;
     }
@@ -84,51 +82,51 @@ class BootpayApi
         throw new \Exception($message);
     }
 
-    public static function setConfiguration($applicationId, $privateKey, $mode = 'production', $clientKey = '', $secretKey = '')
+    public static function setConfiguration($applicationId, $privateKey, $mode = 'production')
     {
         self::$applicationId = $applicationId;
         self::$privateKey = $privateKey;
+        self::$clientKey = '';
+        self::$secretKey = '';
+        self::$token = '';
+        self::$mode = $mode;
+    }
+
+    public static function setClientKeyConfiguration($clientKey, $secretKey, $mode = 'production')
+    {
         self::$clientKey = $clientKey;
         self::$secretKey = $secretKey;
+        self::$applicationId = '';
+        self::$privateKey = '';
+        self::$token = '';
         self::$mode = $mode;
     }
 
     /**
      * request access token
      * Comment by GOSOMI
-     * @deprecated Basic authentication fallback is supported for direct requests
      */
     public static function getAccessToken()
     {
+        // client_key/secret_key 인증은 매 요청에 Basic Auth 헤더가 자동 부착된다.
+        // request/token 호출이 불필요하므로 합성 응답을 즉시 반환한다.
+        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+            self::$token = '';
+            $synthetic = new \stdClass();
+            $synthetic->access_token = '';
+            $synthetic->expire_in = 0;
+            return $synthetic;
+        }
+
         $response = self::request(
             'POST',
             'request/token',
-            array(
-                'application_id' => self::$applicationId,
-                'private_key' => self::$privateKey
-            )
+            array('application_id' => self::$applicationId, 'private_key' => self::$privateKey)
         );
-        if (!isset($response->error_code)) {
+        if ($response && (!isset($response->error_code) || !$response->error_code)) {
             self::$token = $response->access_token;
         }
         return $response;
-    }
-
-    /**
-     * client key가 설정되어 있으면 basic authentication을 사용하고,
-     * 그렇지 않은 경우에만 access token을 발급받는다
-     * Comment by GOSOMI
-     * @date: 2026-03-11
-     */
-    public static function basicOrGetAccessToken()
-    {
-        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
-            return (object)array(
-                'status' => 200,
-                'message' => 'basic authentication을 사용합니다.'
-            );
-        }
-        return self::getAccessToken();
     }
 
     /**
@@ -152,9 +150,6 @@ class BootpayApi
     {
         if (!$cancelPaymentRequestParameters['receipt_id']) {
             return self::exception('receipt_id를 입력해주세요.');
-        }
-        if (isset($cancelPaymentRequestParameters['cancel_price']) && $cancelPaymentRequestParameters['cancel_price'] <= 0) {
-            return self::exception('cancel_price를 0원이상으로 설정해주세요.');
         }
         return self::request(
             'POST',
@@ -204,37 +199,23 @@ class BootpayApi
     }
 
     /**
-     * Lookup Billing Key by BillingKey
-     * Comment by ehowlsla
+     * Lookup Sequential Billing Key
+     * 우선순위(순차) 결제 빌링키 조회
+     * @param string $widgetKey
+     * @param string $billingKey
+     * @param string $userId 조회 대상 회원 ID (서버가 빌링키 소유자 검증에 사용한다)
      */
-    public static function lookupBillingKey($billingKey)
+    public static function lookupSequentialBillingKey($widgetKey, $billingKey, $userId)
     {
+        // RFC3986 인코딩 — NodeJS SDK 의 encodeURIComponent 와 동일한 wire 포맷 (공백을 + 가 아닌 %20 으로)
         return self::request(
             'GET',
-            implode('/', array('billing_key', $billingKey))
+            'subscribe/sequential_billing_key/' . $billingKey . '?' . http_build_query(array(
+                'widget_key' => $widgetKey,
+                'user_id' => $userId
+            ), '', '&', PHP_QUERY_RFC3986)
         );
     }
-
-    /**
-     * 우선순위 빌링키 조회
-     * Comment by GOSOMI
-     * @date: 2026-07-03
-     * @date: 2026-08-18 user_id 파라미터 추가 (회원 단위로 우선순위 빌링키를 조회한다)
-     *        기존 호출과의 하위호환을 위해 user_id를 전달하지 않으면 쿼리에 포함하지 않는다
-     */
-    public static function lookupSequentialBillingKey($widgetKey, $billingKey, $userId = null)
-    {
-        $query = array('widget_key' => $widgetKey);
-        if (isset($userId) && strlen($userId)) {
-            $query['user_id'] = $userId;
-        }
-        return self::request(
-            'GET',
-            sprintf('subscribe/sequential_billing_key/%s?%s', $billingKey, http_build_query($query))
-        );
-    }
-
-
 
     /**
      * Request Billing Key
@@ -300,32 +281,6 @@ class BootpayApi
         );
     }
 
-        /**
-         * Request Subscribe Payment
-         * Comment by ehowlsla
-         * @throws \Exception
-         */
-        public static function requestSubscribePayment($subscriptionRequestParameters)
-        {
-            if (!$subscriptionRequestParameters['billing_key']) {
-                return self::exception('빌링키를 입력해주세요.');
-            }
-            if (!$subscriptionRequestParameters['order_name']) {
-                return self::exception('자동결제할 상품명을 입력해주세요.');
-            }
-            if (!$subscriptionRequestParameters['price']) {
-                return self::exception('자동결제 금액을 입력해주세요.');
-            }
-            if (!$subscriptionRequestParameters['order_id']) {
-                return self::exception('자동결제할 가맹점 고유 주문번호를 입력해주세요.');
-            }
-            return self::request(
-                'POST',
-                'subscribe/payment',
-                $subscriptionRequestParameters
-            );
-        }
-
     /**
      * Destroy Billing Key
      * Comment by GOSOMI
@@ -376,19 +331,6 @@ class BootpayApi
     }
 
     /**
-     * subscribePaymentReserveLookup
-     * Comment by GOSOMI
-     * @date: 2023-03-08
-     */
-    public static function subscribePaymentReserveLookup($reserveId)
-    {
-        return self::request(
-            'GET',
-            'subscribe/payment/reserve/' . $reserveId
-        );
-    }
-
-    /**
      * Cancel Subscribe Reserve
      * Comment by GOSOMI
      * @throws \Exception
@@ -417,94 +359,115 @@ class BootpayApi
     }
 
     /**
-     * 결제건에 대한 현금영수증 발행
-     * Comment by GOSOMI
-     * @date: 2022-07-28
+     * Request Subscribe Payment
+     * @throws \Exception
      */
-    public static function cashReceiptPublishOnReceipt($cashPublishParameters)
+    public static function requestSubscribePayment($subscribePaymentParameters)
+    {
+        if (!$subscribePaymentParameters['billing_key']) {
+            return self::exception('빌링키를 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['order_name']) {
+            return self::exception('자동결제할 상품명을 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['price']) {
+            return self::exception('자동결제 금액을 입력해주세요.');
+        }
+        if (!$subscribePaymentParameters['order_id']) {
+            return self::exception('자동결제할 가맹점 고유 주문번호를 입력해주세요.');
+        }
+        return self::request(
+            'POST',
+            'subscribe/payment',
+            $subscribePaymentParameters
+        );
+    }
+
+    /**
+     * Request Subscribe Automatic Transfer Billing Key
+     * @throws \Exception
+     */
+    public static function requestSubscribeAutomaticTransferBillingKey($params)
     {
         return self::request(
             'POST',
-            'request/receipt/cash/publish',
-            $cashPublishParameters
+            'request/subscribe/automatic-transfer',
+            $params
         );
     }
 
     /**
-     * 결제건에 대한 현금영수증 취소
-     * Comment by GOSOMI
-     * @date: 2022-07-28
+     * Publish Automatic Transfer Billing Key
+     * @throws \Exception
      */
-    public static function cashReceiptCancelOnReceipt($cashCancelParameters)
-    {
-        return self::request(
-            'DELETE',
-            sprintf('request/receipt/cash/cancel/%s?%s', $cashCancelParameters['receipt_id'], http_build_query($cashCancelParameters))
-        );
-    }
-
-    /**
-     * 현금영수증 별건 발행
-     * Comment by GOSOMI
-     * @date: 2022-08-09
-     */
-    public static function requestCashReceipt($requestCashReceiptParameters)
+    public static function publishAutomaticTransferBillingKey($receiptId)
     {
         return self::request(
             'POST',
-            'request/cash/receipt',
-            $requestCashReceiptParameters
-        );
-    }
-
-    /**
-     * 현금영수증 별건 발행 취소하기
-     * Comment by GOSOMI
-     * @date: 2022-08-09
-     */
-    public static function cancelCashReceipt($cancelCashReceiptParameters)
-    {
-        return self::request(
-            'DELETE',
-            sprintf("request/cash/receipt/%s?%s", $cancelCashReceiptParameters['receipt_id'], http_build_query($cancelCashReceiptParameters))
-        );
-    }
-
-    /**
-     * 본인인증 REST API 요청
-     * Comment by GOSOMI
-     * @date: 2022-11-07
-     */
-    public static function requestAuthentication($authenticationRequestParameters)
-    {
-        return self::request(
-            'POST',
-            'request/authentication',
-            $authenticationRequestParameters
-        );
-    }
-
-    /**
-     * 본인인증 승인
-     * Comment by GOSOMI
-     * @date: 2022-11-07
-     */
-    public static function confirmAuthentication($receiptId, $otp = null)
-    {
-        return self::request(
-            'POST',
-            'authenticate/confirm',
+            'request/subscribe/automatic-transfer/publish',
             array(
-                'receipt_id' => $receiptId,
-                'otp' => $otp
+                'receipt_id' => $receiptId
             )
         );
     }
 
     /**
-     * SMS 재발송
-     * Comment by GOSOMI
-     * @date: 2022-11-07
+     * Lookup Billing Key
+     */
+    public static function lookupBillingKey($billingKey)
+    {
+        return self::request(
+            'GET',
+            implode('/', array('billing_key', $billingKey))
+        );
+    }
+
+    /**
+     * Subscribe Payment Reserve Lookup
+     */
+    public static function subscribePaymentReserveLookup($reserveId)
+    {
+        return self::request(
+            'GET',
+            'subscribe/payment/reserve/' . $reserveId
+        );
+    }
+
+    /**
+     * Request Authentication
+     * @throws \Exception
+     */
+    public static function requestAuthentication($params)
+    {
+        return self::request(
+            'POST',
+            'request/authentication',
+            $params
+        );
+    }
+
+    /**
+     * Confirm Authentication
+     * @throws \Exception
+     */
+    public static function confirmAuthentication($receiptId, $otp = null)
+    {
+        $data = array(
+            'receipt_id' => $receiptId
+        );
+        if ($otp !== null) {
+            $data['otp'] = $otp;
+        }
+        return self::request(
+            'POST',
+            'authenticate/confirm',
+            $data
+        );
+    }
+
+    /**
+     * Realarm Authentication
+     * @throws \Exception
      */
     public static function realarmAuthentication($receiptId)
     {
@@ -517,61 +480,116 @@ class BootpayApi
         );
     }
 
-
     /**
-     * 계좌 빌링키 발급
-     * Comment by ehowlsla
-     * @date: 2024-05-28
+     * Cash Receipt Publish On Receipt
+     * @throws \Exception
      */
-    public static function requestSubscribeAutomaticTransferBillingKey($requestTransferBillingKeyParameters)
+    public static function cashReceiptPublishOnReceipt($params)
     {
-        if (!$requestTransferBillingKeyParameters['pg']) {
-            return self::exception('PG Symbol을 입력해주세요.');
-        }
-        if (!$requestTransferBillingKeyParameters['subscription_id']) {
-            return self::exception('가맹점에서 설정한 고유 자동결제 ID를 입력해주세요.');
-        }
-        if (!$requestTransferBillingKeyParameters['order_name']) {
-            return self::exception('자동결제 주문명을 입력해주세요.');
-        }
-
-        if (!$requestTransferBillingKeyParameters['bank_name']) {
-            return self::exception('계좌 은행명을 입력해주세요.');
-        }
-
-        if (!$requestTransferBillingKeyParameters['bank_account']) {
-            return self::exception('계좌 번호를 입력해주세요.');
-        }
-
-        if (!$requestTransferBillingKeyParameters['username']) {
-            return self::exception('계좌주 이름을 입력해주세요.');
-        }
-
-        if (!$requestTransferBillingKeyParameters['identity_no']) {
-            return self::exception('계좌주의 생년월일 6자리 또는 사업자번호 10자리를 입력해주세요.');
-        }
-
         return self::request(
             'POST',
-            'request/subscribe/automatic-transfer',
-            $requestTransferBillingKeyParameters
+            'request/receipt/cash/publish',
+            $params
         );
     }
 
-     /**
-     * 계좌 출금 동의 확인 요청
-     * Comment by ehowlsla
-     * @date: 2024-05-28
+    /**
+     * Cash Receipt Cancel On Receipt
+     * @throws \Exception
      */
+    public static function cashReceiptCancelOnReceipt($receiptId, $params = array())
+    {
+        $url = 'request/receipt/cash/cancel/' . $receiptId;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return self::request(
+            'DELETE',
+            $url
+        );
+    }
 
-     public static function publishAutomaticTransferBillingKey($receiptId)
+    /**
+     * Request Cash Receipt
+     * @throws \Exception
+     */
+    public static function requestCashReceipt($params)
     {
         return self::request(
             'POST',
-            'request/subscribe/automatic-transfer/publish',
-             array(
-                'receipt_id' => $receiptId
-             )
+            'request/cash/receipt',
+            $params
+        );
+    }
+
+    /**
+     * Cancel Cash Receipt
+     * @throws \Exception
+     */
+    public static function cancelCashReceipt($receiptId, $params = array())
+    {
+        $url = 'request/cash/receipt/' . $receiptId;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return self::request(
+            'DELETE',
+            $url
+        );
+    }
+
+    /**
+     * Get User Wallets
+     *
+     * @deprecated 다음 메이저 버전에서 제거 예정. wallet 엔드포인트는 폐기 예정이며,
+     *             결제는 Request::PaymentController#create 의 wallet_id + user_token 으로 처리됩니다.
+     */
+    public static function getUserWallets($userId, $sandbox = false)
+    {
+        @trigger_error(
+            'BootpayApi::getUserWallets() is deprecated and will be removed in a future major version.',
+            E_USER_DEPRECATED
+        );
+        $sandboxStr = $sandbox ? 'true' : 'false';
+        $url = 'wallet?' . http_build_query(array(
+            'user_id' => $userId,
+            'sandbox' => $sandboxStr
+        ));
+        return self::request(
+            'GET',
+            $url
+        );
+    }
+
+    /**
+     * Request Wallet Payment
+     *
+     * @deprecated 다음 메이저 버전에서 제거 예정. wallet 엔드포인트는 폐기 예정이며,
+     *             결제는 wallet_id + user_token 흐름으로 전환하세요.
+     * @throws \Exception
+     */
+    public static function requestWalletPayment($params)
+    {
+        @trigger_error(
+            'BootpayApi::requestWalletPayment() is deprecated and will be removed in a future major version.',
+            E_USER_DEPRECATED
+        );
+        if (!$params['user_id']) {
+            return self::exception('사용자 아이디를 입력해주세요.');
+        }
+        if (!$params['order_name']) {
+            return self::exception('주문명을 입력해주세요.');
+        }
+        if (!$params['price']) {
+            return self::exception('결제 금액을 입력해주세요.');
+        }
+        if (!$params['order_id']) {
+            return self::exception('가맹점 고유 주문번호를 입력해주세요.');
+        }
+        return self::request(
+            'POST',
+            'wallet/payment',
+            $params
         );
     }
 }

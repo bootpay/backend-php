@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  무인자 `vendor/bin/phpunit` 은 offline 스위트만 돈다 (외부 요청 0건).
+  라이브 테스트는 testsuite 옵션으로 명시 실행: `vendor/bin/phpunit [testsuite 옵션] PG` / `Commerce`
+  단, TestConfig 가드로 BOOTPAY_ENV=development 가 아니면 skip 된다 (production 호출 방지).
+-->
+<phpunit
+    bootstrap="vendor/autoload.php"
+    colors="true"
+    verbose="true"
+    stopOnFailure="false"
+    defaultTestSuite="offline"
+>
+    <testsuites>
+        <testsuite name="offline">
+            <file>tests/pg/LegacyCompatibilityTest.php</file>
+            <file>tests/pg/SequentialBillingKeyTest.php</file>
+            <file>tests/pg/PgHttpWireTest.php</file>
+            <file>tests/commerce/CommerceWireFormatTest.php</file>
+            <file>tests/commerce/CommerceHttpWireTest.php</file>
+            <file>tests/commerce/BackwardCompatibilityTest.php</file>
+        </testsuite>
+        <testsuite name="PG">
+            <directory>tests/pg</directory>
+        </testsuite>
+        <testsuite name="Commerce">
+            <directory>tests/commerce</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="BOOTPAY_ENV" value="production"/>
+    </php>
+</phpunit>
