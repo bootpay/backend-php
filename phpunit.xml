@@ -19,6 +19,7 @@
             <file>tests/commerce/CommerceWireFormatTest.php</file>
             <file>tests/commerce/CommerceHttpWireTest.php</file>
             <file>tests/commerce/BackwardCompatibilityTest.php</file>
+            <file>tests/commerce/CommerceScopeTest.php</file>
         </testsuite>
         <testsuite name="PG">
             <directory>tests/pg</directory>

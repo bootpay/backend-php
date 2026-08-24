@@ -69,4 +69,15 @@ class PgHttpWireTest extends WireEchoTestCase
         $this->assertEquals('/v2/receipt/receipt-1', $res->uri);
         $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
     }
+
+    public function testLegacyCredentialsFetchTokenThenSendBearerAuthorization()
+    {
+        BootpayApi::setConfiguration('application-id', 'private-key', 'development');
+
+        $tokenResponse = BootpayApi::getAccessToken();
+        $res = BootpayApi::receiptPayment('receipt-legacy');
+
+        $this->assertEquals('echo-test-token', $tokenResponse->access_token);
+        $this->assertEquals('Bearer echo-test-token', self::echoHeader($res, 'Authorization'));
+    }
 }

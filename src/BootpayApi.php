@@ -17,9 +17,48 @@ class BootpayApi
     );
     private static $postMethods = array('POST', 'PUT');
 
+    /**
+     * mode 에 해당하는 base URL 을 돌려준다.
+     *
+     * 26-08-24: 알 수 없는 mode 는 production 으로 폴백한다 (go · java SDK 와 같은 규칙).
+     * 이전에는 $API_URL[$mode] 를 그대로 인덱싱해서 오타 하나에 Warning 이 뜨고 URL 이
+     * "/{path}" 로 붕괴, curl errno 3 (URL rejected: No host part in the URL) 이 났다.
+     * production 은 display_errors 가 꺼져 있어 Warning 이 보이지 않으므로 mode 와
+     * 무관해 보이는 curl 에러만 남았다.
+     */
+    private static function resolveApiUrl($mode)
+    {
+        if (is_string($mode) && isset(self::$API_URL[$mode])) {
+            return self::$API_URL[$mode];
+        }
+        return self::$API_URL['production'];
+    }
+
+    private static function requireCredentialPair($first, $second, $firstName, $secondName)
+    {
+        $hasFirst = strlen((string)$first) > 0;
+        $hasSecond = strlen((string)$second) > 0;
+        if ($hasFirst !== $hasSecond) {
+            throw new \InvalidArgumentException($firstName . '/' . $secondName . '를 함께 입력해주세요.');
+        }
+        return $hasFirst;
+    }
+
+    private static function requireAuthentication()
+    {
+        $hasClientCredentials = self::requireCredentialPair(self::$clientKey, self::$secretKey, 'client_key', 'secret_key');
+        $hasLegacyCredentials = self::requireCredentialPair(self::$applicationId, self::$privateKey, 'application_id', 'private_key');
+        if ($hasClientCredentials) return;
+        if ($hasLegacyCredentials && strlen(self::$token)) return;
+        if ($hasLegacyCredentials) {
+            throw new \LogicException('legacy application_id/private_key 인증은 getAccessToken()으로 토큰을 먼저 발급해야 합니다.');
+        }
+        throw new \InvalidArgumentException('인증 정보가 없습니다. client_key/secret_key 또는 application_id/private_key를 지정하세요.');
+    }
+
     private static function entrypoints($url)
     {
-        return implode('/', array(self::$API_URL[self::$mode], $url));
+        return implode('/', array(self::resolveApiUrl(self::$mode), $url));
     }
 
     private static function setHeaders($headers)
@@ -54,6 +93,9 @@ class BootpayApi
 
     private static function request($method, $url, $data = null, $headers = null)
     {
+        if ($url !== 'request/token') {
+            self::requireAuthentication();
+        }
         !isset($headers) && $headers = array();
         $isPost = in_array($method, self::$postMethods);
         $channel = curl_init(self::entrypoints($url));
@@ -84,6 +126,7 @@ class BootpayApi
 
     public static function setConfiguration($applicationId, $privateKey, $mode = 'production')
     {
+        self::requireCredentialPair($applicationId, $privateKey, 'application_id', 'private_key');
         self::$applicationId = $applicationId;
         self::$privateKey = $privateKey;
         self::$clientKey = '';
@@ -94,6 +137,7 @@ class BootpayApi
 
     public static function setClientKeyConfiguration($clientKey, $secretKey, $mode = 'production')
     {
+        self::requireCredentialPair($clientKey, $secretKey, 'client_key', 'secret_key');
         self::$clientKey = $clientKey;
         self::$secretKey = $secretKey;
         self::$applicationId = '';
@@ -108,14 +152,19 @@ class BootpayApi
      */
     public static function getAccessToken()
     {
+        $hasClientCredentials = self::requireCredentialPair(self::$clientKey, self::$secretKey, 'client_key', 'secret_key');
+        $hasLegacyCredentials = self::requireCredentialPair(self::$applicationId, self::$privateKey, 'application_id', 'private_key');
         // client_key/secret_key 인증은 매 요청에 Basic Auth 헤더가 자동 부착된다.
         // request/token 호출이 불필요하므로 합성 응답을 즉시 반환한다.
-        if (strlen(self::$clientKey) && strlen(self::$secretKey)) {
+        if ($hasClientCredentials) {
             self::$token = '';
             $synthetic = new \stdClass();
             $synthetic->access_token = '';
             $synthetic->expire_in = 0;
             return $synthetic;
+        }
+        if (!$hasLegacyCredentials) {
+            throw new \InvalidArgumentException('인증 정보가 없습니다. client_key/secret_key 또는 application_id/private_key를 지정하세요.');
         }
 
         $response = self::request(

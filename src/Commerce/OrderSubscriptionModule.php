@@ -224,57 +224,97 @@ class OrderSubscriptionModule
 
     /**
      * 관리자 정기구독 승인
+     * PUT /v1/order_subscriptions/{order_subscription_id}/approve
+     * ⚠️ 서버가 supervisor scope 를 요구한다 (scope_invalid!).
      * @param string $orderSubscriptionId 정기구독 ID
-     * @param array $params 승인 파라미터
+     * @param array $params 승인 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
     public function supervisorApprove($orderSubscriptionId, $params = array())
     {
-        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/approve", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['idempotency_key']);
+        return $this->bootpay->put(
+            "order_subscriptions/{$orderSubscriptionId}/approve",
+            $this->compact($params),
+            $this->supervisorHeaders($idempotencyKey)
+        );
     }
 
     /**
      * 관리자 정기구독 거절
+     * PUT /v1/order_subscriptions/{order_subscription_id}/reject
+     * ⚠️ 서버가 supervisor scope 를 요구한다 (scope_invalid!).
      * @param string $orderSubscriptionId 정기구독 ID
-     * @param array $params 거절 파라미터
+     * @param array $params 거절 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
     public function supervisorReject($orderSubscriptionId, $params = array())
     {
-        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/reject", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['idempotency_key']);
+        return $this->bootpay->put(
+            "order_subscriptions/{$orderSubscriptionId}/reject",
+            $this->compact($params),
+            $this->supervisorHeaders($idempotencyKey)
+        );
     }
 
     /**
      * 관리자 정기구독 해지
+     * PUT /v1/order_subscriptions/{order_subscription_id}/terminate
+     * ⚠️ 서버가 supervisor scope 를 요구한다 (scope_invalid!).
      * @param string $orderSubscriptionId 정기구독 ID
-     * @param array $params 해지 파라미터
+     * @param array $params 해지 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
     public function supervisorTerminate($orderSubscriptionId, $params = array())
     {
-        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/terminate", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['idempotency_key']);
+        return $this->bootpay->put(
+            "order_subscriptions/{$orderSubscriptionId}/terminate",
+            $this->compact($params),
+            $this->supervisorHeaders($idempotencyKey)
+        );
     }
 
     /**
      * 관리자 정기구독 일시정지
+     * PUT /v1/order_subscriptions/{order_subscription_id}/pause
+     * ⚠️ 서버가 supervisor scope 를 요구한다 (scope_invalid!).
      * @param string $orderSubscriptionId 정기구독 ID
-     * @param array $params 일시정지 파라미터
+     * @param array $params 일시정지 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
     public function supervisorPause($orderSubscriptionId, $params = array())
     {
-        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/pause", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['idempotency_key']);
+        return $this->bootpay->put(
+            "order_subscriptions/{$orderSubscriptionId}/pause",
+            $this->compact($params),
+            $this->supervisorHeaders($idempotencyKey)
+        );
     }
 
     /**
      * 관리자 정기구독 재개
+     * PUT /v1/order_subscriptions/{order_subscription_id}/resume
+     * ⚠️ 서버가 supervisor scope 를 요구한다 (scope_invalid!).
      * @param string $orderSubscriptionId 정기구독 ID
-     * @param array $params 재개 파라미터
+     * @param array $params 재개 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
     public function supervisorResume($orderSubscriptionId, $params = array())
     {
-        return $this->bootpay->put("order_subscriptions/{$orderSubscriptionId}/resume", $params);
+        $idempotencyKey = isset($params['idempotency_key']) ? $params['idempotency_key'] : null;
+        unset($params['idempotency_key']);
+        return $this->bootpay->put(
+            "order_subscriptions/{$orderSubscriptionId}/resume",
+            $this->compact($params),
+            $this->supervisorHeaders($idempotencyKey)
+        );
     }
 
     /**

@@ -57,4 +57,25 @@ class LegacyCompatibilityTest extends TestConfig
 
         $this->assertContains('Authorization: Basic ' . base64_encode('ck:sk'), $headers);
     }
+
+    /**
+     * @dataProvider incompletePgCredentials
+     */
+    public function testIncompleteCredentialPairsAreRejectedBeforeRequest($method, $first, $second)
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('함께 입력해주세요.');
+
+        call_user_func(array(BootpayApi::class, $method), $first, $second, 'development');
+    }
+
+    public static function incompletePgCredentials()
+    {
+        return array(
+            'client key only' => array('setClientKeyConfiguration', 'ck', ''),
+            'secret key only' => array('setClientKeyConfiguration', '', 'sk'),
+            'application id only' => array('setConfiguration', 'application-id', ''),
+            'private key only' => array('setConfiguration', '', 'private-key')
+        );
+    }
 }

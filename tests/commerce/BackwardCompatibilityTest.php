@@ -174,6 +174,35 @@ class BackwardCompatibilityTest extends TestCase
         )
     );
 
+    /**
+     * @dataProvider incompleteCommerceCredentials
+     */
+    public function testIncompleteCommerceCredentialsAreRejectedBeforeRequest($clientKey, $secretKey)
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('client_key/secret_key를 함께 입력해주세요.');
+
+        new BootpayCommerceApi($clientKey, $secretKey, 'development');
+    }
+
+    public static function incompleteCommerceCredentials()
+    {
+        return array(
+            'client key only' => array('ck', null),
+            'secret key only' => array(null, 'sk')
+        );
+    }
+
+    public function testCommerceRequestWithoutCredentialsIsRejectedBeforeNetwork()
+    {
+        $api = new BootpayCommerceApi();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('client_key/secret_key를 함께 입력해주세요.');
+
+        $api->user->getList();
+    }
+
     public function testPgApiSurfaceIsBackwardCompatible()
     {
         foreach (self::$pgContract as $method => $requiredIn241) {

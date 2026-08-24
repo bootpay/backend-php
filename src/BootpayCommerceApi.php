@@ -36,7 +36,7 @@ class BootpayCommerceApi
 
     private static $postMethods = array('POST', 'PUT');
     private static $apiVersion = '2.5.0';
-    private static $sdkVersion = '2.5.0';
+    private static $sdkVersion = '2.6.0';
 
     public $user;
     public $userGroup;
@@ -58,7 +58,7 @@ class BootpayCommerceApi
 
     public function __construct($clientKey = null, $secretKey = null, $mode = 'production')
     {
-        if ($clientKey !== null && $secretKey !== null) {
+        if ($clientKey !== null || $secretKey !== null) {
             $this->setConfiguration($clientKey, $secretKey, $mode);
         }
         $this->initModules();
@@ -87,6 +87,7 @@ class BootpayCommerceApi
 
     public function setConfiguration($clientKey, $secretKey, $mode = 'production')
     {
+        $this->requireCommerceCredentials($clientKey, $secretKey);
         $this->clientKey = $clientKey;
         $this->secretKey = $secretKey;
         $this->mode = $mode;
@@ -159,16 +160,38 @@ class BootpayCommerceApi
 
     private function entrypoints($url)
     {
-        return implode('/', array(self::$API_URL[$this->mode], $url));
+        return implode('/', array(self::resolveApiUrl($this->mode), $url));
+    }
+
+    /**
+     * mode 에 해당하는 base URL 을 돌려준다.
+     *
+     * 26-08-24: 알 수 없는 mode 는 production 으로 폴백한다 (go · java SDK 와 같은 규칙).
+     * 이전에는 $API_URL[$mode] 를 그대로 인덱싱해서 오타 하나에 Warning 이 뜨고 URL 이
+     * "/{path}" 로 붕괴, curl errno 3 (URL rejected: No host part in the URL) 이 났다.
+     */
+    private static function resolveApiUrl($mode)
+    {
+        if (is_string($mode) && isset(self::$API_URL[$mode])) {
+            return self::$API_URL[$mode];
+        }
+        return self::$API_URL['production'];
     }
 
     private function getBasicAuthHeader()
     {
-        if (!empty($this->clientKey) && !empty($this->secretKey)) {
-            $credentials = $this->clientKey . ':' . $this->secretKey;
-            return 'Basic ' . base64_encode($credentials);
+        $this->requireCommerceCredentials($this->clientKey, $this->secretKey);
+        $credentials = $this->clientKey . ':' . $this->secretKey;
+        return 'Basic ' . base64_encode($credentials);
+    }
+
+    private function requireCommerceCredentials($clientKey, $secretKey)
+    {
+        $hasClientKey = !empty($clientKey);
+        $hasSecretKey = !empty($secretKey);
+        if (!$hasClientKey || !$hasSecretKey) {
+            throw new \InvalidArgumentException('client_key/secret_key를 함께 입력해주세요.');
         }
-        return '';
     }
 
     private function createHeaders($headers = null, $useBasicAuth = false)

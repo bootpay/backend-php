@@ -60,8 +60,20 @@ class CommerceHttpWireTest extends WireEchoTestCase
         $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
         $this->assertEquals('user', self::echoHeader($res, 'BOOTPAY-ROLE'));
         $this->assertEquals('application/json', self::echoHeader($res, 'Content-Type'));
-        $this->assertEquals('2.5.0', self::echoHeader($res, 'BOOTPAY-SDK-VERSION'));
+        // 버전 리터럴을 박지 않는다 — 헤더가 composer.json 의 패키지 버전을 따라간다는 규약만 고정한다.
+        $composer = json_decode(file_get_contents(__DIR__ . '/../../composer.json'), true);
+        $this->assertEquals($composer['version'], self::echoHeader($res, 'BOOTPAY-SDK-VERSION'));
         $this->assertEquals('303', self::echoHeader($res, 'BOOTPAY-SDK-TYPE'));
+    }
+
+    public function testStoredTokenDoesNotReplaceBasicAuthorization()
+    {
+        $this->api->setToken('stored-token');
+
+        $res = $this->api->user->getList();
+
+        $this->assertEquals('stored-token', $this->api->getToken());
+        $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
     }
 
     public function testRequestScopedSupervisorRoleWinsOnTheWire()

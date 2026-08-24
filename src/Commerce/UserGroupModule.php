@@ -61,24 +61,37 @@ class UserGroupModule
 
     /**
      * 그룹에 사용자 추가
+     * POST /v1/user-groups/{user_group_id}/user
+     * ⚠️ 서버가 manager scope 를 요구한다 (scope_invalid!).
      * @param string $userGroupId 그룹 ID
      * @param string $userId 사용자 ID
+     * @param string|null $idempotencyKey 미지정시 자동 생성
      * @return object
      */
-    public function userCreate($userGroupId, $userId)
+    public function userCreate($userGroupId, $userId, $idempotencyKey = null)
     {
-        return $this->bootpay->post("user-groups/{$userGroupId}/user", array('user_id' => $userId));
+        return $this->bootpay->post(
+            "user-groups/{$userGroupId}/user",
+            array('user_id' => $userId),
+            $this->managerHeaders($idempotencyKey)
+        );
     }
 
     /**
      * 그룹에서 사용자 제거
+     * DELETE /v1/user-groups/{user_group_id}/user/{user_id}
+     * ⚠️ 서버가 manager scope 를 요구한다 (scope_invalid!).
      * @param string $userGroupId 그룹 ID
      * @param string $userId 사용자 ID
+     * @param string|null $idempotencyKey 미지정시 자동 생성
      * @return object
      */
-    public function userDelete($userGroupId, $userId)
+    public function userDelete($userGroupId, $userId, $idempotencyKey = null)
     {
-        return $this->bootpay->delete("user-groups/{$userGroupId}/user/{$userId}");
+        return $this->bootpay->delete(
+            "user-groups/{$userGroupId}/user/{$userId}",
+            $this->managerHeaders($idempotencyKey)
+        );
     }
 
     /**
