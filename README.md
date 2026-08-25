@@ -643,6 +643,46 @@ $response = $bootpay->orderSubscription->requestIng->termination(array(
 ));
 ```
 
+### 구독 가격(기준금액) 변경
+`price` 는 회차별 결제 금액의 기준금액입니다. 변경하면 결제예정(READY) 회차의 청구액이 즉시 다시 계산되고, 이후 회차도 이 금액으로 생성됩니다. 이미 결제된 회차는 그대로입니다. 0 이하는 받지 않습니다.
+
+```php
+$response = $bootpay->orderSubscription->update(array(
+    'order_subscription_id' => 'order_subscription_id_here',
+    'price' => 19900
+));
+```
+
+### 회차별 가감산 조정
+특정 회차만 금액을 가감하려면 조정항목을 사용합니다. 회차 지정 방법은 3가지입니다.
+
+```php
+// 5회차 한 건만
+$response = $bootpay->orderSubscriptionAdjustment->create('order_subscription_id_here', array(
+    'duration' => 5,
+    'price' => -1000,
+    'name' => '5회차 할인'
+));
+
+// 3~7회차 각각 한 건씩 (총 5건)
+$response = $bootpay->orderSubscriptionAdjustment->create('order_subscription_id_here', array(
+    'duration_from' => 3,
+    'duration_to' => 7,
+    'price' => -1000,
+    'name' => '3~7회차 할인'
+));
+
+// 3회차부터 계약 끝까지 (레코드 1건, duration_to 는 무시)
+$response = $bootpay->orderSubscriptionAdjustment->create('order_subscription_id_here', array(
+    'duration_from' => 3,
+    'is_unlimited' => true,
+    'price' => -1000,
+    'name' => '3회차 이후 상시 할인'
+));
+```
+
+> 상한은 계약 총회차이며, 총회차가 무제한인 계약은 60회차까지입니다. 이미 결제가 끝난 회차는 거절되며, 범위 중 한 회차라도 최종 금액이 음수면 전부 거절됩니다 (부분 반영 없음).
+
 ## Role 설정
 
 Commerce API에서는 역할(Role)에 따라 접근 권한이 달라집니다.

@@ -40,7 +40,16 @@ class OrderSubscriptionModule
      * 구독 계약 내용 변경 (supervisor 전용)
      * PUT /v1/order_subscriptions/{order_subscription_id}
      * 바뀐 값만 보내면 된다 (나머지는 서버가 그대로 유지한다).
-     * @param array $params 수정 파라미터 (idempotency_key 는 Idempotency-Key 헤더로 전송된다)
+     *
+     * price 는 회차별 결제 금액의 **기준금액**이다. 바꾸면 결제예정(READY) 회차의 청구액이
+     * 즉시 다시 계산되고, 이후 회차도 이 금액으로 만들어진다. 이미 결제된 회차는 그대로다.
+     * 0 이하는 받지 않는다. 특정 회차만 가감하려면 orderSubscriptionAdjustment->create 를 쓴다.
+     * (관리자 화면의 금액 변경과 같은 구현을 탄다)
+     *
+     * @param array $params 수정 파라미터 (product_id/product_option_id/order_name/total_subscription_duration/
+     *                      quantity/address_id/username/phone/email/use_free_trial/free_trial_day/
+     *                      service_start_at/service_end_at/price
+     *                      / idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      * @throws \Exception
      */

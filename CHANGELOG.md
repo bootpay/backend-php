@@ -1,3 +1,25 @@
+### 2.6.2
+
+Ruby SDK parity — 구독 기준금액 변경 · 회차 범위 조정항목 (`9832af9`). **공개 API 변화 없음** (두 메서드 모두 배열 파라미터 패스스루라 시그니처는 그대로다).
+
+#### 구독 기준금액 변경 — `orderSubscription->update(['price' => ...])`
+
+`price` 는 회차별 결제 금액의 **기준금액**이다. 바꾸면 결제예정(READY) 회차의 청구액이 즉시 다시 계산되고, 이후 회차도 이 금액으로 만들어진다. 이미 결제된 회차는 그대로다. 0 이하는 받지 않는다. 특정 회차만 가감하려면 `orderSubscriptionAdjustment->create` 를 쓴다. (관리자 화면의 금액 변경과 같은 구현을 탄다)
+
+#### 회차 범위로 조정항목 추가 — `orderSubscriptionAdjustment->create`
+
+`duration_from` / `duration_to` / `is_unlimited` 를 받는다. 회차 지정 방법 3가지 (아래로 갈수록 넓다):
+
+- `duration: 5` → 5회차 한 건만
+- `duration_from: 3, duration_to: 7` → 3~7회차 각각 한 건씩 (총 5건)
+- `duration_from: 3, is_unlimited: true` → 3회차부터 계약 끝까지 (레코드는 1건, `duration_to` 는 무시)
+
+상한은 계약 총회차이며, 총회차가 무제한인 계약은 60회차까지다. 이미 결제가 끝난 회차는 거절된다. 범위 중 한 회차라도 최종 금액이 음수면 전부 거절된다 (부분 반영 없음).
+
+#### 테스트
+
+- `CommerceWireFormatTest` 에 회차 범위 · 무제한 범위 · `is_unlimited=false` 보존 · 기준금액 전송 회귀 4건 추가.
+
 ### 2.6.1
 
 패키징·안전성 개선. **공개 API 변화 없음** (2.6.0 대비 메서드 추가·삭제·시그니처 변경 0건).

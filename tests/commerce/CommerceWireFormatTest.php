@@ -501,6 +501,58 @@ class CommerceWireFormatTest extends TestCase
         $this->assertEquals(array('price' => 0, 'duration' => 1, 'tax_free_price' => 0, 'title' => 'setup'), $call['data']);
     }
 
+    public function testAdjustmentCreateSupportsDurationRange()
+    {
+        $this->api->orderSubscriptionAdjustment->create('os-1', array(
+            'name' => '3~7회차 할인',
+            'price' => -1000,
+            'duration_from' => 3,
+            'duration_to' => 7
+        ));
+        $call = $this->lastCall();
+
+        $this->assertEquals('POST', $call['method']);
+        $this->assertEquals('order_subscriptions/os-1/adjustments', $call['url']);
+        $this->assertEquals(
+            array(
+                'price' => -1000,
+                'duration' => 1,
+                'tax_free_price' => 0,
+                'name' => '3~7회차 할인',
+                'duration_from' => 3,
+                'duration_to' => 7
+            ),
+            $call['data']
+        );
+        $this->assertEquals('supervisor', $this->headerValue('BOOTPAY-ROLE'));
+    }
+
+    public function testAdjustmentCreateSupportsUnlimitedRange()
+    {
+        $this->api->orderSubscriptionAdjustment->create('os-1', array(
+            'price' => 500,
+            'duration_from' => 3,
+            'is_unlimited' => true
+        ));
+        $call = $this->lastCall();
+
+        // is_unlimited=false 도 살아있어야 한다 (compact 는 null 만 제거)
+        $this->assertArrayHasKey('is_unlimited', $call['data']);
+        $this->assertTrue($call['data']['is_unlimited']);
+        $this->assertEquals(3, $call['data']['duration_from']);
+        $this->assertArrayNotHasKey('duration_to', $call['data']);
+    }
+
+    public function testAdjustmentCreateKeepsFalseUnlimitedFlag()
+    {
+        $this->api->orderSubscriptionAdjustment->create('os-1', array('duration' => 5, 'is_unlimited' => false));
+        $call = $this->lastCall();
+
+        $this->assertArrayHasKey('is_unlimited', $call['data']);
+        $this->assertFalse($call['data']['is_unlimited']);
+        $this->assertEquals(5, $call['data']['duration']);
+    }
+
     public function testAdjustmentUpdateSupportsAdjustmentsArray()
     {
         $this->api->orderSubscriptionAdjustment->update(array(
@@ -572,6 +624,23 @@ class CommerceWireFormatTest extends TestCase
 
         $this->assertEquals('order_subscriptions/os-1', $call['url']);
         $this->assertEquals(array('price' => 900), $call['data']);
+        $this->assertEquals('supervisor', $this->headerValue('BOOTPAY-ROLE'));
+    }
+
+    public function testOrderSubscriptionUpdateSendsBasePriceWithOtherFields()
+    {
+        $this->api->orderSubscription->update(array(
+            'order_subscription_id' => 'os-1',
+            'order_name' => '프리미엄 구독',
+            'price' => 19900,
+            'quantity' => null
+        ));
+        $call = $this->lastCall();
+
+        $this->assertEquals('PUT', $call['method']);
+        $this->assertEquals('order_subscriptions/os-1', $call['url']);
+        // price 는 회차 기준금액 — 바디에 그대로 실려야 하고 null 값은 빠져야 한다
+        $this->assertEquals(array('order_name' => '프리미엄 구독', 'price' => 19900), $call['data']);
         $this->assertEquals('supervisor', $this->headerValue('BOOTPAY-ROLE'));
     }
 

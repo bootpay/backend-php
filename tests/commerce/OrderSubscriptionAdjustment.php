@@ -27,6 +27,30 @@ try {
     );
     print_r($response);
 
+    // 3~7회차에 각각 한 건씩 조정 추가 (총 5건)
+    // $response = $bootpay->orderSubscriptionAdjustment->create(
+    //     'subscription_id_here',
+    //     array(
+    //         'duration_from' => 3,
+    //         'duration_to' => 7,
+    //         'price' => -1000,
+    //         'name' => '3~7회차 할인'
+    //     )
+    // );
+    // print_r($response);
+
+    // 3회차부터 계약 끝까지 조정 추가 (레코드 1건, duration_to 는 무시된다)
+    // $response = $bootpay->orderSubscriptionAdjustment->create(
+    //     'subscription_id_here',
+    //     array(
+    //         'duration_from' => 3,
+    //         'is_unlimited' => true,
+    //         'price' => -1000,
+    //         'name' => '3회차 이후 상시 할인'
+    //     )
+    // );
+    // print_r($response);
+
     // 정기구독 조정 수정
     // $response = $bootpay->orderSubscriptionAdjustment->update(array(
     //     'order_subscription_id' => 'subscription_id_here',
