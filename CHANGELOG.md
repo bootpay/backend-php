@@ -1,3 +1,21 @@
+### 2.6.1
+
+패키징·안전성 개선. **공개 API 변화 없음** (2.6.0 대비 메서드 추가·삭제·시그니처 변경 0건).
+
+#### PSR-4 정합 — `OrderSubscriptionRequestIngModule` 파일 분리
+
+`OrderSubscriptionRequestIngModule` 이 `src/Commerce/OrderSubscriptionModule.php` 안에 함께 정의돼 있어, 이 클래스를 **직접 참조하면 autoload 가 실패**할 수 있었다 (`OrderSubscriptionModule` 이 먼저 로드된 경우에만 우연히 동작). `src/Commerce/OrderSubscriptionRequestIngModule.php` 로 분리했다.
+
+- 네임스페이스·클래스명은 그대로다 (`Bootpay\ServerPhp\Commerce\OrderSubscriptionRequestIngModule`).
+- 기존 사용법 `$commerce->orderSubscription->requestIng->...` 은 변화 없다.
+
+#### 알 수 없는 mode 에 경고 추가
+
+2.6.0 에서 알 수 없는 mode 를 `production` 으로 폴백하도록 바꿨는데, 결제 SDK 에서 `developmnet` 같은 **오타가 조용히 production 으로 나가면 실거래가 발생한다**. 폴백은 유지하되 `E_USER_WARNING` 을 함께 낸다.
+
+- 정상 mode(`development`/`stage`/`production`)에는 경고가 없다.
+- 경고는 실행을 막지 않으므로 기존 동작이 깨지지 않는다.
+
 ### 2.6.0
 
 #### Commerce scope(BOOTPAY-ROLE) 정합성 (동작 변경)

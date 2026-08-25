@@ -31,6 +31,17 @@ class BootpayApi
         if (is_string($mode) && isset(self::$API_URL[$mode])) {
             return self::$API_URL[$mode];
         }
+        // 26-08-24: 알 수 없는 mode 는 production 으로 폴백하되 **조용히 넘어가지 않는다**.
+        // 폴백 자체는 go·java SDK 와 같은 규칙이지만, 결제 SDK 에서 'developmnet' 같은
+        // 오타가 조용히 production 으로 나가면 실거래가 발생한다. 경고를 남겨 로그에서 잡히게 한다.
+        trigger_error(
+            sprintf(
+                'Bootpay: 알 수 없는 mode "%s" — production 으로 폴백합니다. '
+                . 'development / stage / production 중 하나를 지정하세요.',
+                is_string($mode) ? $mode : gettype($mode)
+            ),
+            E_USER_WARNING
+        );
         return self::$API_URL['production'];
     }
 

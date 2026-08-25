@@ -91,25 +91,74 @@ class CommerceScopeTest extends TestCase
     }
 
     /**
-     * 알 수 없는 mode 는 production 으로 폴백한다.
+     * 알 수 없는 mode 는 production 으로 폴백하되 경고를 남긴다.
+     *
      * 예전에는 $API_URL[$mode] 를 그대로 인덱싱해 Warning + URL 붕괴(curl errno 3)가 났다.
+     * 26-08-24: 폴백으로 바꾸되, 결제 SDK 에서 오타가 조용히 production 으로 나가면
+     * 실거래가 발생하므로 E_USER_WARNING 을 함께 낸다.
      */
-    public function testUnknownModeFallsBackToProduction()
+    public function testUnknownModeFallsBackToProductionWithWarning()
     {
-        $resolve = new ReflectionMethod(BootpayCommerceApi::class, 'resolveApiUrl');
-        if (PHP_VERSION_ID < 80100) {
-            $resolve->setAccessible(true);
-        }
-        $this->assertSame('https://api.bootapi.com/v1', $resolve->invoke(null, 'produciton'));
-        $this->assertSame('https://api.bootapi.com/v1', $resolve->invoke(null, null));
-        $this->assertSame('https://dev-api.bootapi.com/v1', $resolve->invoke(null, 'development'));
+        $cases = array(
+            array(BootpayCommerceApi::class, 'produciton', 'https://api.bootapi.com/v1'),
+            array(BootpayCommerceApi::class, null,         'https://api.bootapi.com/v1'),
+            array(BootpayApi::class,         'prod',       'https://api.bootpay.co.kr/v2'),
+            array(BootpayApi::class,         '',           'https://api.bootpay.co.kr/v2'),
+        );
 
-        $pgResolve = new ReflectionMethod(BootpayApi::class, 'resolveApiUrl');
-        if (PHP_VERSION_ID < 80100) {
-            $pgResolve->setAccessible(true);
+        foreach ($cases as $case) {
+            list($class, $mode, $expected) = $case;
+            $warnings = array();
+            set_error_handler(function ($no, $str) use (&$warnings) {
+                $warnings[] = $str;
+                return true;
+            }, E_USER_WARNING);
+
+            $resolve = new ReflectionMethod($class, 'resolveApiUrl');
+            if (PHP_VERSION_ID < 80100) {
+                $resolve->setAccessible(true);
+            }
+            $actual = $resolve->invoke(null, $mode);
+            restore_error_handler();
+
+            $this->assertSame($expected, $actual, 'production 으로 폴백해야 한다');
+            $this->assertCount(1, $warnings, '알 수 없는 mode 는 경고를 남겨야 한다');
+            $this->assertStringContainsString('알 수 없는 mode', $warnings[0]);
         }
-        $this->assertSame('https://api.bootpay.co.kr/v2', $pgResolve->invoke(null, 'prod'));
-        $this->assertSame('https://api.bootpay.co.kr/v2', $pgResolve->invoke(null, ''));
-        $this->assertSame('https://dev-api.bootpay.co.kr/v2', $pgResolve->invoke(null, 'development'));
+    }
+
+    /** 정상 mode 는 경고 없이 해당 URL 을 돌려준다 */
+    public function testKnownModeEmitsNoWarning()
+    {
+        $warnings = array();
+        set_error_handler(function ($no, $str) use (&$warnings) {
+            $warnings[] = $str;
+            return true;
+        }, E_USER_WARNING);
+
+        $commerce = new ReflectionMethod(BootpayCommerceApi::class, 'resolveApiUrl');
+        $pg = new ReflectionMethod(BootpayApi::class, 'resolveApiUrl');
+        if (PHP_VERSION_ID < 80100) {
+            $commerce->setAccessible(true);
+            $pg->setAccessible(true);
+        }
+        $this->assertSame('https://dev-api.bootapi.com/v1', $commerce->invoke(null, 'development'));
+        $this->assertSame('https://dev-api.bootpay.co.kr/v2', $pg->invoke(null, 'development'));
+        restore_error_handler();
+
+        $this->assertSame(array(), $warnings, '정상 mode 에는 경고가 없어야 한다');
+    }
+
+    /**
+     * PSR-4: requestIng 모듈이 자기 파일에서 단독으로 autoload 되어야 한다.
+     * 26-08-24 이전에는 OrderSubscriptionModule.php 안에 같이 들어 있어,
+     * 그 클래스를 직접 참조하면 autoload 가 실패할 수 있었다.
+     */
+    public function testRequestIngModuleIsAutoloadableOnItsOwn()
+    {
+        $fqcn = 'Bootpay\\ServerPhp\\Commerce\\OrderSubscriptionRequestIngModule';
+        $this->assertTrue(class_exists($fqcn), 'PSR-4 로 단독 autoload 되어야 한다');
+        $file = (new \ReflectionClass($fqcn))->getFileName();
+        $this->assertSame('OrderSubscriptionRequestIngModule.php', basename($file));
     }
 }
