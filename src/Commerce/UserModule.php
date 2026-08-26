@@ -166,7 +166,11 @@ class UserModule
 
     /**
      * 사용자 목록 조회
-     * @param array|null $params 조회 파라미터
+     * ⚠️ 회원등급 필터의 서버(v1/users_controller#index) 키는 membership_type 이다.
+     *    예전 SDK 가 보내던 member_type 은 서버가 읽지 않아 필터가 조용히 무시됐다 —
+     *    기존 호출 호환을 위해 member_type 도 그대로 받되 membership_type 으로 바꿔 보낸다.
+     * @param array|null $params 조회 파라미터 (page/limit/keyword/membership_type/type
+     *                           — member_type 은 membership_type 의 별칭)
      * @return object
      */
     public function getList($params = null)
@@ -256,8 +260,10 @@ class UserModule
         if (isset($params['keyword'])) {
             $query['keyword'] = $params['keyword'];
         }
-        if (isset($params['member_type'])) {
-            $query['member_type'] = $params['member_type'];
+        if (isset($params['membership_type'])) {
+            $query['membership_type'] = $params['membership_type'];
+        } elseif (isset($params['member_type'])) {
+            $query['membership_type'] = $params['member_type'];
         }
         if (isset($params['type'])) {
             $query['type'] = $params['type'];

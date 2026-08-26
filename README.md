@@ -456,10 +456,13 @@ $response = $bootpay->user->join(array(
 ```
 
 ### 사용자 목록 조회
+회원등급 필터의 서버 키는 `membership_type` 입니다. 기존 호환을 위해 `member_type` 으로 넘겨도 `membership_type` 으로 전송됩니다.
+
 ```php
 $response = $bootpay->user->getList(array(
     'page' => 1,
-    'limit' => 10
+    'limit' => 10,
+    'membership_type' => 1
 ));
 ```
 
@@ -522,6 +525,13 @@ $response = $bootpay->product->getList(array(
     'page' => 1,
     'limit' => 10
 ));
+
+// Mall API — category_id / ex_uid / sort 필터 지원 (ex_uid 는 외부 UID 로 상품 조회)
+$response = $bootpay->product->products(array(
+    'page' => 1,
+    'limit' => 10,
+    'ex_uid' => 'EX-1'
+));
 ```
 
 ### 상품 생성
@@ -534,8 +544,11 @@ $response = $bootpay->product->create(array(
 ```
 
 ### 상품 상세 조회
+`user_jwt` 를 함께 넘기면 회원 컨텍스트로 조회합니다 (선택).
+
 ```php
 $response = $bootpay->product->detail('product_id_here');
+$response = $bootpay->product->detail('product_id_here', 'user_jwt_here');
 ```
 
 ### 상품 수정
@@ -554,10 +567,16 @@ $response = $bootpay->product->delete('product_id_here');
 ## 5. 주문 관리
 
 ### 주문 목록 조회
+`status` / `payment_status` / `order_subscription_ids` 는 배열·단일 값·콤마 문자열을 모두 받습니다 (빈 값은 전송하지 않습니다).
+날짜 필터 키는 `search_date_from` / `search_date_to` 입니다.
+
 ```php
 $response = $bootpay->order->getList(array(
     'page' => 1,
-    'limit' => 10
+    'limit' => 10,
+    'status' => array(1, 2),
+    'order_subscription_ids' => array('order_subscription_id_here'),
+    'subscription_billing_type' => 1
 ));
 ```
 
@@ -603,10 +622,13 @@ $response = $bootpay->invoice->notify('invoice_id_here', array(
 ## 7. 정기구독 관리
 
 ### 정기구독 목록 조회
+`order_number` 로 주문번호 역조회가 가능합니다. 날짜 필터 키는 `search_date_from` / `search_date_to` (또는 `s_at` / `e_at`) 입니다.
+
 ```php
 $response = $bootpay->orderSubscription->getList(array(
     'page' => 1,
-    'limit' => 10
+    'limit' => 10,
+    'order_number' => 'order_number_here'
 ));
 ```
 
@@ -649,7 +671,8 @@ $response = $bootpay->orderSubscription->requestIng->termination(array(
 ```php
 $response = $bootpay->orderSubscription->update(array(
     'order_subscription_id' => 'order_subscription_id_here',
-    'price' => 19900
+    'price' => 19900,
+    'memo' => '고객 요청 금액 변경' // 변경이력에 남길 사유 (선택)
 ));
 ```
 

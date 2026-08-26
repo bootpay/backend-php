@@ -30,7 +30,7 @@ class ProductModule
      * page/limit 은 미지정시 각각 1 / 20 이 적용되고, 나머지 값은 지정된 것만 전송한다.
      * ⚠️ keyword 는 서버(v1/products_controller#index)가 읽지 않는다 — page/limit/category_id/ex_uid/sort 만 사용하며
      *    keyword 를 보내도 조용히 무시된다. 하위호환 때문에 인자는 남겨두되, 검색이 필요하면 서버 지원이 선행되어야 한다.
-     * @param array|null $params 조회 파라미터 (user_jwt 는 Bootpay-User-JWT 헤더,
+     * @param array|null $params 조회 파라미터 (page/limit/category_id/ex_uid/sort — user_jwt 는 Bootpay-User-JWT 헤더,
      *                           idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      */
@@ -47,6 +47,9 @@ class ProductModule
         );
         if (isset($params['category_id'])) {
             $query['category_id'] = $params['category_id'];
+        }
+        if (isset($params['ex_uid'])) {
+            $query['ex_uid'] = $params['ex_uid'];
         }
         if (isset($params['sort'])) {
             $query['sort'] = $params['sort'];
@@ -97,12 +100,16 @@ class ProductModule
 
     /**
      * 상품 상세 조회
+     * GET /v1/products/{product_id}
+     * user_jwt 를 넘기면 Bootpay-User-JWT 헤더가 붙어 회원 컨텍스트로 조회한다 (productDetail 과 동작이 같다).
      * @param string $productId 상품 ID
+     * @param string|null $userJwt 회원 JWT (선택)
+     * @param string|null $idempotencyKey 미지정시 자동 생성
      * @return object
      */
-    public function detail($productId)
+    public function detail($productId, $userJwt = null, $idempotencyKey = null)
     {
-        return $this->bootpay->get("products/{$productId}");
+        return $this->bootpay->get("products/{$productId}", $this->mallHeaders($userJwt, $idempotencyKey));
     }
 
     /**

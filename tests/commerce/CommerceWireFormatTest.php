@@ -667,6 +667,98 @@ class CommerceWireFormatTest extends TestCase
         );
     }
 
+    public function testOrderListSupportsSubscriptionFilters()
+    {
+        $this->api->order->getList(array(
+            'order_subscription_ids' => array('os-1', 'os-2'),
+            'subscription_billing_type' => 1,
+            'status' => array(1, 2)
+        ));
+        $this->assertEquals(
+            'orders?subscription_billing_type=1&status=1%2C2&order_subscription_ids=os-1%2Cos-2',
+            $this->lastCall()['url']
+        );
+    }
+
+    public function testOrderListAcceptsScalarListFilters()
+    {
+        // 배열뿐 아니라 콤마 문자열·단일 값도 그대로 실린다
+        $this->api->order->getList(array(
+            'status' => 1,
+            'payment_status' => '1,2',
+            'order_subscription_ids' => 'os-1'
+        ));
+        $this->assertEquals(
+            'orders?status=1&payment_status=1%2C2&order_subscription_ids=os-1',
+            $this->lastCall()['url']
+        );
+    }
+
+    public function testOrderListOmitsEmptyListFilters()
+    {
+        // 빈 배열이면 status= 같은 빈 값을 실어 보내지 않는다
+        $this->api->order->getList(array(
+            'page' => 1,
+            'status' => array(),
+            'payment_status' => array(),
+            'order_subscription_ids' => array()
+        ));
+        $this->assertEquals('orders?page=1', $this->lastCall()['url']);
+    }
+
+    public function testOrderSubscriptionListSupportsOrderNumber()
+    {
+        // 주문번호 역조회 — 서버(#index)가 params[:order_number] 를 읽는다
+        $this->api->orderSubscription->getList(array('order_number' => 'ON-1'));
+        $this->assertEquals('order_subscriptions?order_number=ON-1', $this->lastCall()['url']);
+    }
+
+    public function testOrderSubscriptionUpdateSendsMemo()
+    {
+        // memo 는 변경이력에 남길 사유로 바디에 그대로 실려야 한다
+        $this->api->orderSubscription->update(array(
+            'order_subscription_id' => 'os-1',
+            'price' => 19900,
+            'memo' => '고객 요청 금액 변경'
+        ));
+        $call = $this->lastCall();
+
+        $this->assertEquals('order_subscriptions/os-1', $call['url']);
+        $this->assertEquals(array('price' => 19900, 'memo' => '고객 요청 금액 변경'), $call['data']);
+        $this->assertEquals('supervisor', $this->headerValue('BOOTPAY-ROLE'));
+    }
+
+    public function testProductsSupportsExUid()
+    {
+        $this->api->product->products(array('ex_uid' => 'EX-1'));
+        $this->assertEquals('products?page=1&limit=20&ex_uid=EX-1', $this->lastCall()['url']);
+    }
+
+    public function testProductDetailAliasAcceptsUserJwt()
+    {
+        // detail 도 productDetail 과 같이 회원 컨텍스트 조회를 지원한다
+        $this->api->product->detail('prod-1', 'jwt-1');
+        $call = $this->lastCall();
+
+        $this->assertEquals('products/prod-1', $call['url']);
+        $this->assertEquals('jwt-1', $this->headerValue('Bootpay-User-JWT'));
+        $this->assertNotNull($this->headerValue('Idempotency-Key'));
+
+        $this->api->product->detail('prod-1');
+        $this->assertEquals('products/prod-1', $this->lastCall()['url']);
+        $this->assertNull($this->headerValue('Bootpay-User-JWT'));
+    }
+
+    public function testUserListSendsMembershipTypeAndKeepsMemberTypeAlias()
+    {
+        // 서버가 읽는 키는 membership_type — member_type 으로 넘겨도 같은 키로 나가야 한다
+        $this->api->user->getList(array('membership_type' => 1));
+        $this->assertEquals('users?membership_type=1', $this->lastCall()['url']);
+
+        $this->api->user->getList(array('member_type' => 2));
+        $this->assertEquals('users?membership_type=2', $this->lastCall()['url']);
+    }
+
     // ---------- 13. BOOTPAY-ROLE scope ----------
 
     public function testOrderSubscriptionRequestListRoleDependsOnProjectId()

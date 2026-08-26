@@ -15,7 +15,12 @@ class OrderModule
 
     /**
      * 주문 목록 조회
-     * @param array|null $params 조회 파라미터
+     * ⚠️ 날짜 키는 search_date_from/to 다 (서버는 css_at/cse_at 도 별칭으로 받는다).
+     * status / payment_status / order_subscription_ids 는 배열·문자열을 모두 받아 콤마로 이어 보내고,
+     * 값이 비면 아예 보내지 않는다 (status= 같은 빈 값은 서버가 무시하지만 노이즈다).
+     * @param array|null $params 조회 파라미터 (page/limit/keyword/user_id/user_group_id/cs_type/
+     *                           search_date_from/search_date_to/status/payment_status/
+     *                           order_subscription_ids/subscription_billing_type)
      * @return object
      */
     public function getList($params = null)
@@ -47,6 +52,21 @@ class OrderModule
             'search_date' => $searchDate
         ));
         return $this->bootpay->get("orders/month?{$query}");
+    }
+
+    /**
+     * 배열 또는 단일 값을 콤마 문자열로 잇는다. 값이 비어 있으면 null 을 돌려 쿼리에서 빠지게 한다.
+     */
+    private function joinList($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_array($value)) {
+            $value = array($value);
+        }
+        $joined = implode(',', $value);
+        return $joined === '' ? null : $joined;
     }
 
     private function buildQueryString($params)
@@ -89,14 +109,19 @@ class OrderModule
         if (isset($params['subscription_billing_type'])) {
             $query['subscription_billing_type'] = $params['subscription_billing_type'];
         }
-        if (isset($params['status']) && is_array($params['status'])) {
-            $query['status'] = implode(',', $params['status']);
+        $status = $this->joinList(isset($params['status']) ? $params['status'] : null);
+        if ($status !== null) {
+            $query['status'] = $status;
         }
-        if (isset($params['payment_status']) && is_array($params['payment_status'])) {
-            $query['payment_status'] = implode(',', $params['payment_status']);
+        $paymentStatus = $this->joinList(isset($params['payment_status']) ? $params['payment_status'] : null);
+        if ($paymentStatus !== null) {
+            $query['payment_status'] = $paymentStatus;
         }
-        if (isset($params['order_subscription_ids']) && is_array($params['order_subscription_ids'])) {
-            $query['order_subscription_ids'] = implode(',', $params['order_subscription_ids']);
+        $orderSubscriptionIds = $this->joinList(
+            isset($params['order_subscription_ids']) ? $params['order_subscription_ids'] : null
+        );
+        if ($orderSubscriptionIds !== null) {
+            $query['order_subscription_ids'] = $orderSubscriptionIds;
         }
 
         if (empty($query)) {

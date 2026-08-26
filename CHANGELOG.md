@@ -1,3 +1,38 @@
+### 2.6.3
+
+Ruby SDK parity — SDK 에 누락돼 있던 조회·수정 파라미터 보강 (`d4c8989`). 서버는 이미 읽고 있었는데 SDK 가 보내지 않아 쓸 수 없던 것들이다. **제거된 메서드·파라미터 없음.**
+
+#### 주문 목록 — `order->getList`
+
+- `status` / `payment_status` / `order_subscription_ids` 가 **배열뿐 아니라 단일 값·콤마 문자열**도 받는다 (배열만 콤마로 잇던 것을 일반화).
+- 값이 비어 있으면(`[]`) 아예 전송하지 않는다. 이전에는 `status=` 처럼 빈 값이 실려 나갔다 (서버는 무시했지만 노이즈였다).
+- `order_subscription_ids` · `subscription_billing_type` 은 2.6.2 에서 이미 지원한다 — 구독 계약별 · 결제유형별 필터.
+
+#### 정기구독 목록 — `orderSubscription->getList(['order_number' => ...])`
+
+주문번호로 구독을 역조회한다. 서버(`#index`)가 `params[:order_number]` 를 읽는데 SDK 가 보내지 않고 있었다.
+⚠️ 날짜 키는 `search_date_from`/`search_date_to` (또는 `s_at`/`e_at`) 다 — `order->getList` 의 `css_at`/`cse_at` 와 다르다.
+
+#### 구독 계약 변경 — `orderSubscription->update(['memo' => ...])`
+
+변경이력(`SUBSCRIPTION_ACTION_UPDATE`)에 남길 사유다. 파라미터 배열은 패스스루라 시그니처는 그대로다.
+
+#### 상품 목록 — `product->products(['ex_uid' => ...])`
+
+외부 UID 로 상품을 찾는다. 컨트롤러가 `params[:ex_uid]` 를 읽는데 SDK 에 인자가 없었다.
+
+#### 상품 상세 — `product->detail($productId, $userJwt = null, $idempotencyKey = null)`
+
+매뉴얼이 `GET /v1/products/:id` 에 `user_jwt` 를 안내하는데 `detail` 만 헤더를 보내지 않아 회원 컨텍스트 조회가 안 됐다. 이제 `productDetail` 과 동작이 같다 (`Idempotency-Key` 자동 부착, `user_jwt` 지정시 `Bootpay-User-JWT` 헤더). 인자는 모두 선택이라 기존 `detail($productId)` 호출은 그대로 동작한다.
+
+#### 회원 목록 — `user->getList(['membership_type' => ...])`
+
+서버(`v1/users_controller#index`)가 읽는 회원등급 필터 키는 `membership_type` 인데 SDK 는 `member_type` 을 보내고 있어 **필터가 에러 없이 무시되고 전체 목록이 돌아왔다.** 이제 `membership_type` 으로 보낸다. 기존 호출 호환을 위해 `member_type` 도 계속 받아 같은 키로 매핑한다 (둘 다 있으면 `membership_type` 우선).
+
+#### 테스트
+
+- `CommerceWireFormatTest` 에 구독 필터 · 스칼라 목록값 · 빈 목록값 생략 · `order_number` · `memo` · `ex_uid` · `detail` 의 `user_jwt` · `membership_type` 별칭 회귀 8건 추가.
+
 ### 2.6.2
 
 Ruby SDK parity — 구독 기준금액 변경 · 회차 범위 조정항목 (`9832af9`). **공개 API 변화 없음** (두 메서드 모두 배열 파라미터 패스스루라 시그니처는 그대로다).

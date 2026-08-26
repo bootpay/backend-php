@@ -17,7 +17,10 @@ class OrderSubscriptionModule
 
     /**
      * 정기구독 목록 조회
-     * @param array|null $params 조회 파라미터
+     * ⚠️ 날짜 키는 search_date_from/to (또는 s_at/e_at) 다 — order->getList 의 css_at/cse_at 와 다르다.
+     * order_number 로 주문번호 역조회도 된다.
+     * @param array|null $params 조회 파라미터 (page/limit/keyword/search_date_from/search_date_to/
+     *                           s_at/e_at/request_type/user_group_id/status/user_id/order_number)
      * @return object
      */
     public function getList($params = null)
@@ -46,9 +49,11 @@ class OrderSubscriptionModule
      * 0 이하는 받지 않는다. 특정 회차만 가감하려면 orderSubscriptionAdjustment->create 를 쓴다.
      * (관리자 화면의 금액 변경과 같은 구현을 탄다)
      *
+     * memo 는 변경이력(SUBSCRIPTION_ACTION_UPDATE)에 남길 사유다.
+     *
      * @param array $params 수정 파라미터 (product_id/product_option_id/order_name/total_subscription_duration/
      *                      quantity/address_id/username/phone/email/use_free_trial/free_trial_day/
-     *                      service_start_at/service_end_at/price
+     *                      service_start_at/service_end_at/price/memo
      *                      / idempotency_key 는 Idempotency-Key 헤더로 전송된다)
      * @return object
      * @throws \Exception
@@ -266,6 +271,9 @@ class OrderSubscriptionModule
         }
         if (isset($params['user_id'])) {
             $query['user_id'] = $params['user_id'];
+        }
+        if (isset($params['order_number'])) {
+            $query['order_number'] = $params['order_number'];
         }
 
         if (empty($query)) {
