@@ -1,4 +1,18 @@
-### 2.6.3
+### 2.8.0
+
+#### `product.list` 의 조회 필터를 서버 실제 계약에 맞춤
+
+서버(`v1/products_controller#index`)가 읽는 것은 **page · limit · keyword · category_id · ex_uid · sort** 뿐인데,
+``product->getList()`` 은 정작 그중 `category_id` · `ex_uid` · `sort` 를 **보내지 않고**, 서버가 읽지 않는
+`type` · `period_type` · `s_at` · `e_at` · `category_code` 만 보내고 있었다.
+필터가 걸린 줄 알았는데 전체 목록이 돌아오는, `member_type` → `membership_type` 과 같은 조용한 실패였다.
+
+- `조회 파라미터 배열` 에 **`category_id` / `ex_uid` / `sort`** 추가 — 서버가 읽는 값이라 이제 실제로 필터가 걸린다.
+- 서버가 읽지 않는 `type` / `period_type` / `s_at` / `e_at` / `category_code` 는 **전송은 그대로 유지**하되(기존 호출 보호) 무시된다는 경고를 문서에 달았다.
+  `type` 은 서버의 상품 타입 필터가 문자열(`subscription`/`discount`/`normal`)이라 이 숫자 필드와 값 체계 자체가 다르다.
+- ⚠️ `keyword` 는 **26-08-26 서버 변경부터** 실제로 적용된다 (그 이전 배포본에서는 무시된다).
+  같은 라운드에서 `GET /v1/products` 의 `sort` 가 항상 무시되던 서버 버그도 함께 고쳤다 — SDK 쪽 변경은 없다.
+
 
 Ruby SDK parity — SDK 에 누락돼 있던 조회·수정 파라미터 보강 (`d4c8989`). 서버는 이미 읽고 있었는데 SDK 가 보내지 않아 쓸 수 없던 것들이다. **제거된 메서드·파라미터 없음.**
 
@@ -6,7 +20,7 @@ Ruby SDK parity — SDK 에 누락돼 있던 조회·수정 파라미터 보강 
 
 - `status` / `payment_status` / `order_subscription_ids` 가 **배열뿐 아니라 단일 값·콤마 문자열**도 받는다 (배열만 콤마로 잇던 것을 일반화).
 - 값이 비어 있으면(`[]`) 아예 전송하지 않는다. 이전에는 `status=` 처럼 빈 값이 실려 나갔다 (서버는 무시했지만 노이즈였다).
-- `order_subscription_ids` · `subscription_billing_type` 은 2.6.2 에서 이미 지원한다 — 구독 계약별 · 결제유형별 필터.
+- `order_subscription_ids` · `subscription_billing_type` 은 2.7.0 에서 이미 지원한다 — 구독 계약별 · 결제유형별 필터.
 
 #### 정기구독 목록 — `orderSubscription->getList(['order_number' => ...])`
 
@@ -33,7 +47,7 @@ Ruby SDK parity — SDK 에 누락돼 있던 조회·수정 파라미터 보강 
 
 - `CommerceWireFormatTest` 에 구독 필터 · 스칼라 목록값 · 빈 목록값 생략 · `order_number` · `memo` · `ex_uid` · `detail` 의 `user_jwt` · `membership_type` 별칭 회귀 8건 추가.
 
-### 2.6.2
+### 2.7.0
 
 Ruby SDK parity — 구독 기준금액 변경 · 회차 범위 조정항목 (`9832af9`). **공개 API 변화 없음** (두 메서드 모두 배열 파라미터 패스스루라 시그니처는 그대로다).
 

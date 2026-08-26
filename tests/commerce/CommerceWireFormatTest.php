@@ -255,6 +255,25 @@ class CommerceWireFormatTest extends TestCase
         $this->assertEquals('jwt-1', $this->headerValue('Bootpay-User-JWT'));
     }
 
+    public function testProductListSendsServerReadFilters()
+    {
+        // 서버(v1/products_controller#index)가 읽는 category_id / ex_uid / sort 를 실어야 한다
+        $this->api->product->getList(array(
+            'page'        => 1,
+            'limit'       => 10,
+            'keyword'     => 'coffee',
+            'category_id' => 'cat-1',
+            'ex_uid'      => 'EX-1',
+            'sort'        => '-price'
+        ));
+        $call = $this->lastCall();
+
+        $this->assertEquals('GET', $call['method']);
+        foreach (array('page=1', 'limit=10', 'keyword=coffee', 'category_id=cat-1', 'ex_uid=EX-1', 'sort=-price') as $fragment) {
+            $this->assertStringContainsString($fragment, $call['url']);
+        }
+    }
+
     public function testProductsWithoutParamsSendsDefaults()
     {
         $this->api->product->products();
