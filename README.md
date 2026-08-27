@@ -44,6 +44,14 @@ PHP 언어로 작성된 어플리케이션, 프레임워크 등에서 사용가�
   - [5. 주문 관리](#5-주문-관리)
   - [6. 청구서 관리](#6-청구서-관리)
   - [7. 정기구독 관리](#7-정기구독-관리)
+  - [8. 알림톡](#8-알림톡)
+    - [8-1. 발신프로필(카카오채널)](#8-1-발신프로필카카오채널)
+    - [8-2. 공식 템플릿 카탈로그](#8-2-공식-템플릿-카탈로그)
+    - [8-3. 자체 템플릿](#8-3-자체-템플릿)
+    - [8-4. 발송](#8-4-발송)
+    - [8-5. 발송내역·집계](#8-5-발송내역집계)
+    - [8-6. 수신거부](#8-6-수신거부)
+    - [8-7. 웹훅](#8-7-웹훅)
 
 ### 기타
 - [Example 프로젝트](#example-프로젝트)
@@ -705,6 +713,246 @@ $response = $bootpay->orderSubscriptionAdjustment->create('order_subscription_id
 ```
 
 > 상한은 계약 총회차이며, 총회차가 무제한인 계약은 60회차까지입니다. 이미 결제가 끝난 회차는 거절되며, 범위 중 한 회차라도 최종 금액이 음수면 전부 거절됩니다 (부분 반영 없음).
+
+## 8. 알림톡
+
+카카오 알림톡 발송·템플릿·수신거부·웹훅을 다루는 `/v1/alimtalk` 계열 API입니다.
+
+> ⚠️ **발송 계열은 샌드박스가 없습니다.** `alimtalkSend->send()` · `sendBulk()` 는 실제로 카카오톡이 나가고 과금되며,
+> `alimtalkSender->otp()` 는 채널 관리자폰으로 실제 문자를, `alimtalkSender->create()` · `alimtalkTemplate->register()` ·
+> `alimtalkTemplate->inspect()` 는 카카오에 실제 등록·검수 요청을 보냅니다.
+
+> 알림톡 계열은 서버 스코프가 전부 `user:alimtalk_*` 라 `BOOTPAY-ROLE: user` 로 고정 전송됩니다.
+> 또한 **`Idempotency-Key` 헤더를 붙이지 않습니다** — 알림톡 API 는 이 헤더를 읽지 않으며, 멱등은 발송 payload 의 `ref_id` 로만 성립합니다.
+
+### 8-1. 발신프로필(카카오채널)
+
+카테고리 조회 → OTP 발송 → 발신프로필 등록 → 목록/상세 → 연동 해지 순으로 사용합니다.
+등록이 끝나면 서버가 그룹키 등록까지 수행하므로 공식 템플릿은 별도 채택 없이 바로 발송됩니다.
+
+```php
+// 등록에 필요한 category_code 후보 조회
+$response = $bootpay->alimtalkSender->categories();
+
+// ⚠️ 채널 관리자폰으로 실제 문자가 발송됩니다
+$response = $bootpay->alimtalkSender->otp(array(
+    'yellow_id' => '@bootpay',
+    'phone' => '01012345678'
+));
+
+// ⚠️ 카카오에 발신프로필이 실제 등록됩니다 (같은 yellow_id 재등록 시 기존 프로필 재사용)
+$response = $bootpay->alimtalkSender->create(array(
+    'otp' => '123456',
+    'yellow_id' => '@bootpay',
+    'phone' => '01012345678',
+    'category_code' => '001001'
+));
+
+$response = $bootpay->alimtalkSender->getList();
+$response = $bootpay->alimtalkSender->detail('ksp_id_here');        // 자체 DB 만 조회
+$response = $bootpay->alimtalkSender->detail('ksp_id_here', true);  // 벤더에서 상태 재조회 (느립니다)
+
+// 템플릿 미리보기용 변수 예문 (표시용이며 발송값이 아닙니다. 보낸 키만 덮어씁니다)
+$response = $bootpay->alimtalkSender->variableExamples('ksp_id_here', array(
+    'user_name' => '홍길동',
+    'company_name' => '부트페이몰'
+));
+
+// 이 프로젝트와의 연동만 끊습니다 (채널 모델·템플릿은 보존)
+$response = $bootpay->alimtalkSender->release('ksp_id_here');
+```
+
+### 8-2. 공식 템플릿 카탈로그
+
+부트페이가 미리 카카오 승인을 받아 둔 템플릿이라, 그룹키가 등록된 채널이면 **검수 없이 즉시 발송**됩니다. 전부 조회 계열이라 부작용이 없습니다.
+
+```php
+// keyword 는 본문·이름·분류 부분일치. msg_type 은 BA(기본형)·EX(부가정보형)만 존재합니다.
+$response = $bootpay->alimtalkOfficial->getList(array(
+    'keyword' => '주문',
+    'category' => '주문',
+    'msg_type' => 'BA',
+    'page' => 1,
+    'per' => 20,     // 서버 기본 20, 최대 100
+    'ksp_id' => 'ksp_id_here'
+));
+
+// 보내려는 문구로 유사 템플릿 추천 (score 내림차순)
+$response = $bootpay->alimtalkOfficial->recommend(array(
+    'text' => '주문이 완료되었습니다',
+    'limit' => 5
+));
+
+$response = $bootpay->alimtalkOfficial->detail('official_code_here');
+```
+
+### 8-3. 자체 템플릿
+
+(초안 생성 → 확인 → 대행사 등록) → 검수 요청 → 승인(APR) → 발송 가능 순서입니다.
+
+> ⚠️ `register` 를 명시적으로 `false` 로 주지 않으면 **생성 즉시 대행사·카카오에 실제 등록**됩니다.
+> 본문 변수는 `#{변수명}` 형식이며 템플릿 전체에서 최대 40개입니다.
+
+```php
+// ins: 1 REG(등록) / 2 REQ(검수요청) / 3 APR(승인) / 4 KRR(등록거절) / 5 REJ(승인반려) — 'APR' 같은 문자열도 받습니다
+// ⚠️ 페이지네이션이 없습니다 (필터에 걸린 템플릿을 한 번에 모두 반환)
+$response = $bootpay->alimtalkTemplate->getList(array(
+    'ins' => 'APR',
+    'sort' => 'latest',  // latest(기본) / oldest / code
+    'keyword' => '주문'
+));
+
+// 초안만 생성 (권장)
+$response = $bootpay->alimtalkTemplate->create(array(
+    'ksp_id' => 'ksp_id_here',
+    'name' => '주문완료 안내',
+    'content' => "#{user_name}님, 주문이 완료되었습니다.",
+    'register' => false,
+    'msg_type' => 'BA',           // BA / EX(template_extra 필수) / AD / MI (AD·MI 는 채널추가 버튼 필수)
+    'emphasize_type' => 'NONE',   // NONE / TEXT / IMAGE / ITEM_LIST
+    'examples' => array('user_name' => '홍길동')  // 주면 모든 변수에 예문이 있어야 합니다
+));
+
+// ⚠️ sync 는 서버 기본값이 true 라 조회만 해도 벤더 동기화가 일어납니다. 초안은 false 권장.
+$response = $bootpay->alimtalkTemplate->detail('template_id_here', false);
+
+// ⚠️ 부분 수정이 아닙니다 — 보내지 않은 필드는 null 로 덮어써집니다. 항상 전체 필드를 보내세요.
+$response = $bootpay->alimtalkTemplate->update('template_id_here', array(
+    'name' => '주문완료 안내',
+    'content' => "#{user_name}님, 주문이 완료되었습니다."
+));
+
+$response = $bootpay->alimtalkTemplate->register('template_id_here'); // ⚠️ 대행사·카카오 실제 등록
+$response = $bootpay->alimtalkTemplate->inspect('template_id_here');  // ⚠️ 카카오 검수 요청 (취소 불가)
+$response = $bootpay->alimtalkTemplate->delete('template_id_here');
+
+// 이미지 업로드 — 돌려받은 image_url 을 create/update 의 storage_image_url 로 넘깁니다
+$response = $bootpay->alimtalkTemplate->image('/path/to/body.png');            // jpg/png · 500KB 이하 · 가로 500px 이상 · 2:1
+$response = $bootpay->alimtalkTemplate->highlightImage('/path/to/thumb.png');  // jpg/png · 500KB 이하 · 가로 108px 이상 · 1:1
+```
+
+내보내기는 `format` 기본값이 `json` 입니다. `csv` 로 주면 응답을 파싱하지 않고 원문 그대로 돌려줍니다.
+
+```php
+$response = $bootpay->alimtalkTemplate->export(array(
+    'scope' => 'private',   // private(기본) / official / all
+    'ksp_id' => 'ksp_id_here',
+    'status' => 'APR',
+    'include_content' => true
+));
+
+// csv 는 { body: '<원문 문자열>', content_type: '...', status: 200 } 로 돌아옵니다
+$csv = $bootpay->alimtalkTemplate->export(array('format' => 'csv', 'scope' => 'private'));
+echo $csv->body;
+```
+
+> 1회 5,000건을 넘으면 거부(3031)되므로 채널·상태 필터로 좁혀 주세요.
+
+### 8-4. 발송
+
+> ⚠️ **실제로 카카오톡이 발송되고 과금됩니다.**
+
+```php
+$response = $bootpay->alimtalkSend->send(array(
+    'template_code' => 'template_code_here',
+    'to' => '01012345678',
+    'variables' => array('user_name' => '홍길동', 'company_name' => '부트페이몰'),
+    'ref_id' => 'order-0001',                     // 멱등 키 — 같은 값으로 재요청하면 기존 receipt 를 반환
+    'fallback' => false,                          // 알림톡 실패 시 문자(LMS) 대체발송
+    'reserved_at' => '2026-09-01T10:00:00+09:00', // 생략하면 즉시 발송
+    'sender_key' => 'sender_key_here'             // 연동 채널이 둘 이상일 때만 필수
+));
+```
+
+> `fallback` 은 **미지정(생략)과 `false` 의 의미가 다릅니다.** 생략하면 프로젝트 기본값을 따르고, `false` 는 명시적으로 끕니다.
+> 켜면 발신번호가 등록돼 있어야 하며 없으면 거부(3030)됩니다.
+
+```php
+// 벌크 발송 (1요청 = N수신자) — ⚠️ 수신자 수만큼 실제 발송·과금됩니다
+$response = $bootpay->alimtalkSend->sendBulk(array(
+    'template_code' => 'template_code_here',
+    'recipients' => array(
+        array('to' => '01012345678', 'ref_id' => 'bulk-0001', 'variables' => array('user_name' => '홍길동')),
+        array('to' => '01087654321', 'ref_id' => 'bulk-0002', 'variables' => array('user_name' => '김철수'))
+    )
+));
+
+// 예약 발송 취소 — 접수(READY) 상태의 예약 건만 가능합니다
+$response = $bootpay->alimtalkSend->cancel('receipt_id_here');
+```
+
+> 벌크는 쿼터를 넘으면 요청 시점에 **전체 거부**(3022)됩니다. 수신거부 번호는 `skipped` 로 빠지며 과금되지 않습니다.
+
+### 8-5. 발송내역·집계
+
+**유료** 알림톡만 조회됩니다(무료 커머스 알림톡은 포함되지 않습니다).
+
+```php
+$response = $bootpay->alimtalkMessage->getList(array(
+    'template_code' => 'template_code_here',
+    'status' => 'success',   // requested / success / failed / canceled
+    'ref_id' => 'order-0001',
+    'to' => '01012345678',
+    's_at' => '2026-08-01',
+    'e_at' => '2026-08-27',
+    'page' => 1,
+    'limit' => 20            // 서버 기본 20, 최대 100
+));
+
+$response = $bootpay->alimtalkMessage->stats(array('s_at' => '2026-08-01', 'e_at' => '2026-08-27'));
+$response = $bootpay->alimtalkMessage->detail('receipt_id_here');
+```
+
+> 기간 기본값은 최근 30일이고 최대 조회 폭은 92일입니다. 초과분은 거부하지 않고 시작일을 당겨 잘라내므로, 실제 적용 구간은 응답의 `period` 로 확인하세요.
+> 집계의 `billing.unit_price_source` 가 `default` 면 **잠정 단가**입니다(확정 청구액이 아닙니다).
+
+### 8-6. 수신거부
+
+발송 판정과 같은 기준(부트페이 전역 + 내 프로젝트)으로 다룹니다.
+
+```php
+// phone 은 숫자만 남겨 부분일치로 찾습니다 (50건 단위 페이징)
+$response = $bootpay->alimtalkOptout->getList(array('phone' => '1234', 'page' => 1));
+
+$response = $bootpay->alimtalkOptout->create(array('phone' => '01012345678', 'reason' => 'CRM 동기화'));
+
+// 발송 전 사전 확인 — 벌크에서 skipped 로 낭비될 건을 미리 뺄 수 있습니다 (1회 최대 1,000건)
+$response = $bootpay->alimtalkOptout->check(array('phones' => array('01012345678', '01087654321')));
+$response = $bootpay->alimtalkOptout->check(array('phone' => '01012345678'));
+
+$response = $bootpay->alimtalkOptout->release('01012345678');
+```
+
+> ⚠️ 전역(global) 수신거부는 **조회는 되지만 해제할 수 없습니다**(`releasable: false`).
+> 해제를 호출해도 전역 차단은 남고 응답의 `global_blocked: true` 로 알려 줍니다.
+
+### 8-7. 웹훅
+
+> ⚠️ **주문·구독 통합 웹훅(`webhook->sendTest()`)과 완전히 별개입니다.** 알림톡 이벤트를 기존 주문 웹훅 URL 로 태우면 수신 서버가 모르는 payload 를 받아 기존 연동이 깨집니다.
+
+```php
+$response = $bootpay->alimtalkWebhook->detail();   // 미설정이면 { configured: false }
+
+// url 은 https 만 허용합니다. 최초 저장 시 서명 시크릿이 자동 발급됩니다.
+$response = $bootpay->alimtalkWebhook->update(array(
+    'url' => 'https://example.com/hooks/alimtalk',
+    'events' => array(301, 302, 303, 304, 310, 311),
+    'enabled' => true
+));
+
+$response = $bootpay->alimtalkWebhook->test();          // ⚠️ 설정된 URL 로 실제 요청이 나갑니다
+$response = $bootpay->alimtalkWebhook->rotateSecret();  // ⚠️ 이 응답에서만 secret 원문을 돌려줍니다
+$response = $bootpay->alimtalkWebhook->deliveries(array('page' => 1, 'limit' => 20));
+```
+
+이벤트 코드: `300` 발송 접수(기본 미구독) / `301` 전달 성공 / `302` 전달 실패 / `303` 예약 취소 / `304` 문자(LMS) 대체발송 전환 / `310` 검수 승인 / `311` 검수 반려 / `320` 수신거부 등록(기본 미구독). `events` 를 비우면 기본 구독셋(`301`·`302`·`303`·`304`·`310`·`311`)이 적용됩니다.
+
+서명 검증은 다음 헤더로 합니다. 타임스탬프가 5분 이상 지난 요청은 거부하세요(replay 방지).
+
+```
+X-Bootpay-Signature: sha256=HMAC_SHA256(secret, "{X-Bootpay-Timestamp}.{raw_body}")
+```
+
 
 ## Role 설정
 

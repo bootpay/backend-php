@@ -220,6 +220,91 @@ class CommerceHttpWireTest extends WireEchoTestCase
         $this->assertEquals('supervisor', self::echoHeader($res, 'BOOTPAY-ROLE'));
     }
 
+    /**
+     * 알림톡 템플릿 이미지: 파일 필드명이 images[n] 이 아니라 image 로 나가야 한다.
+     * (상품 이미지와 필드명이 다르다 — images[0] 으로 보내면 서버가 이미지를 못 찾는다)
+     */
+    public function testAlimtalkTemplateImageTransmitsNamedImageField()
+    {
+        $dir = sys_get_temp_dir() . '/bootpay-php-alimtalk-' . uniqid();
+        mkdir($dir);
+        file_put_contents($dir . '/tpl.png', 'png-bytes');
+
+        try {
+            $res = $this->api->alimtalkTemplate->image($dir . '/tpl.png', 'https://cdn.bootpay.co.kr/old.png');
+
+            $this->assertEquals('POST', $res->method);
+            $this->assertEquals('/v1/alimtalk/templates/image', $res->uri);
+
+            $contentType = self::echoHeader($res, 'Content-Type');
+            $this->assertStringStartsWith('multipart/form-data', $contentType);
+            $this->assertStringContainsString('boundary=', $contentType);
+
+            $files = (array)$res->files;
+            $this->assertArrayHasKey('image', $files);
+            $this->assertArrayNotHasKey('images', $files);
+            $this->assertEquals('tpl.png', $files['image']);
+
+            $post = (array)$res->post;
+            $this->assertEquals('https://cdn.bootpay.co.kr/old.png', $post['replace_url']);
+
+            $this->assertEquals('user', self::echoHeader($res, 'BOOTPAY-ROLE'));
+            $this->assertNull(
+                self::echoHeader($res, 'Idempotency-Key'),
+                '알림톡 API 는 Idempotency-Key 를 읽지 않는다'
+            );
+        } finally {
+            @unlink($dir . '/tpl.png');
+            @rmdir($dir);
+        }
+    }
+
+    /**
+     * 템플릿 내보내기 csv: 파싱하지 않는 원문 경로로 나가고 본문을 문자열 그대로 돌려준다.
+     * 공용 request() 를 타면 csv 가 json_decode 를 통과하지 못해 성공한 요청이 null 로 보인다.
+     */
+    public function testAlimtalkTemplateExportCsvReturnsRawBody()
+    {
+        $res = $this->api->alimtalkTemplate->export(array('format' => 'csv', 'scope' => 'private'));
+
+        $this->assertIsString($res->body);
+        $this->assertStringContainsString('application/json', $res->content_type); // echo 서버의 응답 타입
+        $this->assertEquals(200, $res->status);
+
+        $echoed = json_decode($res->body);
+        $this->assertEquals('GET', $echoed->method);
+        $this->assertEquals('/v1/alimtalk/templates/export?format=csv&scope=private', $echoed->uri);
+        $this->assertEquals('*/*', self::echoHeader($echoed, 'Accept'));
+        $this->assertEquals('user', self::echoHeader($echoed, 'BOOTPAY-ROLE'));
+        $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($echoed, 'Authorization'));
+    }
+
+    /** json(기본) 내보내기는 공용 request() 를 타고 파싱된 객체를 돌려준다 */
+    public function testAlimtalkTemplateExportJsonUsesParsedRequest()
+    {
+        $res = $this->api->alimtalkTemplate->export();
+
+        $this->assertEquals('/v1/alimtalk/templates/export?format=json', $res->uri);
+        $this->assertEquals('application/json', self::echoHeader($res, 'Content-Type'));
+    }
+
+    public function testAlimtalkSendTransmitsFalseFallbackInBody()
+    {
+        $res = $this->api->alimtalkSend->send(array(
+            'template_code' => 'TPL-1',
+            'to' => '01012345678',
+            'fallback' => false
+        ));
+
+        $this->assertEquals('POST', $res->method);
+        $this->assertEquals('/v1/alimtalk/send', $res->uri);
+        $this->assertSame(
+            array('template_code' => 'TPL-1', 'to' => '01012345678', 'fallback' => false),
+            json_decode($res->raw_body, true)
+        );
+        $this->assertEquals('user', self::echoHeader($res, 'BOOTPAY-ROLE'));
+    }
+
     public function testMallUserSessionTransmitsJwtHeader()
     {
         $res = $this->api->user->userSession('jwt-1');

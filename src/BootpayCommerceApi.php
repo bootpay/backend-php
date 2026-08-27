@@ -19,6 +19,13 @@ use Bootpay\ServerPhp\Commerce\PointModule;
 use Bootpay\ServerPhp\Commerce\CartModule;
 use Bootpay\ServerPhp\Commerce\MallSettingModule;
 use Bootpay\ServerPhp\Commerce\WebhookModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkSenderModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkTemplateModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkSendModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkMessageModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkOptoutModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkOfficialModule;
+use Bootpay\ServerPhp\Commerce\AlimtalkWebhookModule;
 
 class BootpayCommerceApi
 {
@@ -36,7 +43,7 @@ class BootpayCommerceApi
 
     private static $postMethods = array('POST', 'PUT');
     private static $apiVersion = '2.5.0';
-    private static $sdkVersion = '2.8.0';
+    private static $sdkVersion = '2.9.0';
 
     public $user;
     public $userGroup;
@@ -55,6 +62,13 @@ class BootpayCommerceApi
     public $cart;
     public $mallSetting;
     public $webhook;
+    public $alimtalkSender;
+    public $alimtalkTemplate;
+    public $alimtalkSend;
+    public $alimtalkMessage;
+    public $alimtalkOptout;
+    public $alimtalkOfficial;
+    public $alimtalkWebhook;
 
     public function __construct($clientKey = null, $secretKey = null, $mode = 'production')
     {
@@ -83,6 +97,13 @@ class BootpayCommerceApi
         $this->cart = new CartModule($this);
         $this->mallSetting = new MallSettingModule($this);
         $this->webhook = new WebhookModule($this);
+        $this->alimtalkSender = new AlimtalkSenderModule($this);
+        $this->alimtalkTemplate = new AlimtalkTemplateModule($this);
+        $this->alimtalkSend = new AlimtalkSendModule($this);
+        $this->alimtalkMessage = new AlimtalkMessageModule($this);
+        $this->alimtalkOptout = new AlimtalkOptoutModule($this);
+        $this->alimtalkOfficial = new AlimtalkOfficialModule($this);
+        $this->alimtalkWebhook = new AlimtalkWebhookModule($this);
     }
 
     public function setConfiguration($clientKey, $secretKey, $mode = 'production')
@@ -317,6 +338,64 @@ class BootpayCommerceApi
         return $json;
     }
 
+    /**
+     * JSON 이 아닌 본문(CSV 등)을 파싱하지 않고 그대로 받는다.
+     *
+     * ⚠️ 공용 request() 는 응답을 무조건 json_decode 하므로, CSV 를 돌려주는 엔드포인트
+     *    (알림톡 템플릿 내보내기 format=csv)에서는 성공한 요청인데도 null 이 돌아와
+     *    "통신 실패" 로 오인된다. 그래서 원문 경로를 따로 둔다.
+     * @param string $method
+     * @param string $url
+     * @param array|null $headers
+     * @return object { body: '<원문 문자열>', content_type: '...', status: 200 }
+     */
+    public function requestRaw($method, $url, $headers = null)
+    {
+        $fullUrl = $this->entrypoints($url);
+
+        $rawHeaders = array(
+            'Accept: */*',
+            'Accept-Charset: utf-8',
+            'BOOTPAY-SDK-VERSION: ' . self::$sdkVersion,
+            'BOOTPAY-API-VERSION: ' . self::$apiVersion,
+            'BOOTPAY-SDK-TYPE: 303',
+            'BOOTPAY-ROLE: ' . $this->role
+        );
+
+        $basicAuth = $this->getBasicAuthHeader();
+        if (!empty($basicAuth)) {
+            $rawHeaders[] = 'Authorization: ' . $basicAuth;
+        }
+
+        if (!empty($headers)) {
+            $rawHeaders = $this->mergeHeaders($rawHeaders, $headers);
+        }
+
+        $channel = curl_init($fullUrl);
+        curl_setopt($channel, CURLOPT_URL, $fullUrl);
+        curl_setopt($channel, CURLOPT_HTTPHEADER, $rawHeaders);
+        if ($method !== 'GET') {
+            curl_setopt($channel, CURLOPT_CUSTOMREQUEST, $method);
+        }
+        curl_setopt($channel, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($channel);
+        $errno = curl_errno($channel);
+        $errMsg = curl_error($channel);
+        $status = curl_getinfo($channel, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($channel, CURLINFO_CONTENT_TYPE);
+
+        if ($errno) {
+            throw new \Exception('error: ' . $errno . ', msg: ' . $errMsg);
+        }
+
+        return (object)array(
+            'body' => $response === false ? '' : $response,
+            'content_type' => $contentType === null ? '' : $contentType,
+            'status' => (int)$status
+        );
+    }
+
     public function requestMultipart($method, $url, $data = null, $files = null, $headers = null)
     {
         $fullUrl = $this->entrypoints($url);
@@ -366,7 +445,10 @@ class BootpayCommerceApi
         if ($files !== null && is_array($files)) {
             foreach ($files as $index => $filePath) {
                 if (file_exists($filePath)) {
-                    $postData["images[$index]"] = new \CURLFile($filePath);
+                    // 정수 키는 상품 이미지처럼 images[0], images[1] ... 로 인덱싱하고,
+                    // 문자열 키는 그 이름을 필드명으로 그대로 쓴다 (알림톡 템플릿 이미지의 image 필드).
+                    $field = is_string($index) ? $index : "images[$index]";
+                    $postData[$field] = new \CURLFile($filePath);
                 }
             }
         }
@@ -395,6 +477,17 @@ class BootpayCommerceApi
     public function post($url, $data = null, $headers = null)
     {
         return $this->request('POST', $url, $data, $headers);
+    }
+
+    /**
+     * 원문(파싱하지 않은) GET 요청 — CSV 등 JSON 이 아닌 응답용
+     * @param string $url
+     * @param array|null $headers
+     * @return object
+     */
+    public function getRaw($url, $headers = null)
+    {
+        return $this->requestRaw('GET', $url, $headers);
     }
 
     public function postWithBasicAuth($url, $data = null, $headers = null)
