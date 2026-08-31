@@ -43,7 +43,7 @@ class BootpayCommerceApi
 
     private static $postMethods = array('POST', 'PUT');
     private static $apiVersion = '2.5.0';
-    private static $sdkVersion = '2.9.0';
+    private static $sdkVersion = '2.9.1';
 
     public $user;
     public $userGroup;

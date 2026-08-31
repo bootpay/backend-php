@@ -389,6 +389,18 @@ if (!$token->error_code) {
 }
 ```
 
+`pg` 는 **선택 파라미터**입니다. 생략하면 가맹점에 설정된 기본 PG 로 발행됩니다.
+
+```php
+$response = BootpayApi::requestCashReceipt(array(
+    'price' => 1000,
+    'order_name' => '테스트 상품',
+    'order_id' => 'order_' . time(),
+    'cash_receipt_type' => '소득공제',
+    'identity_no' => '01012345678'
+));
+```
+
 ### 9-4. 별건 현금영수증 발행 취소
 
 ```php

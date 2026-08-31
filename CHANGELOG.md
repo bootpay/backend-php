@@ -1,3 +1,31 @@
+### 2.9.1
+
+Ruby SDK parity — 별건 현금영수증의 `pg` 를 선택 파라미터로 (`c716a1f`). **기존 메서드·파라미터 제거 없음.**
+
+Ruby 의 `request_cash_receipt(pg:, ...)` 가 `request_cash_receipt(pg: nil, ...)` 로 바뀌었다.
+PG 를 지정하지 않으면 가맹점에 설정된 **기본 PG** 로 현금영수증이 발행된다.
+
+PHP 는 파라미터를 연관배열로 받으므로 호출부에서 `pg` 를 빼는 것 자체는 원래도 가능했지만,
+그렇게 하면 요청 바디에서 키가 통째로 사라져 Ruby 가 보내는 wire 와 달라진다.
+Ruby 쪽 `request` 는 payload 를 `.compact` 하지 않아 `"pg": null` 이 그대로 실려 나가기 때문이다.
+그래서 `requestCashReceipt()` 는 `pg` 키가 없을 때 `null` 을 채워 **항상 payload 에 싣는다** (`array_key_exists` 기준이라
+호출부가 명시한 `null` 도 그대로 유지된다).
+
+```php
+// pg 생략 — 가맹점 기본 PG 로 발행
+BootpayApi::requestCashReceipt(array(
+    'price'             => 1000,
+    'tax_free'          => 0,
+    'order_name'        => '테스트 상품',
+    'order_id'          => 'order_' . time(),
+    'cash_receipt_type' => '소득공제',
+    'identity_no'       => '01012345678'
+));
+```
+
+검증은 offline wire 스위트(`tests/pg/PgHttpWireTest.php`)에 붙였다 — echo 서버로 실제 curl 바디를 받아
+`pg` 생략시 `"pg": null`, 명시시 지정한 값이 나가는지 본다.
+
 ### 2.9.0
 
 Ruby SDK parity — 알림톡 v1 API 35종 (`8f1ee1e`). **기존 메서드·파라미터 제거 없음.**
