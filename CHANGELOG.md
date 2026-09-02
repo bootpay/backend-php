@@ -1,3 +1,85 @@
+### 2.9.1
+
+Ruby SDK parity — 별건 현금영수증의 `pg` 를 선택 파라미터로 (`c716a1f`). **기존 메서드·파라미터 제거 없음.**
+
+Ruby 의 `request_cash_receipt(pg:, ...)` 가 `request_cash_receipt(pg: nil, ...)` 로 바뀌었다.
+PG 를 지정하지 않으면 가맹점에 설정된 **기본 PG** 로 현금영수증이 발행된다.
+
+PHP 는 파라미터를 연관배열로 받으므로 호출부에서 `pg` 를 빼는 것 자체는 원래도 가능했지만,
+그렇게 하면 요청 바디에서 키가 통째로 사라져 Ruby 가 보내는 wire 와 달라진다.
+Ruby 쪽 `request` 는 payload 를 `.compact` 하지 않아 `"pg": null` 이 그대로 실려 나가기 때문이다.
+그래서 `requestCashReceipt()` 는 `pg` 키가 없을 때 `null` 을 채워 **항상 payload 에 싣는다** (`array_key_exists` 기준이라
+호출부가 명시한 `null` 도 그대로 유지된다).
+
+```php
+// pg 생략 — 가맹점 기본 PG 로 발행
+BootpayApi::requestCashReceipt(array(
+    'price'             => 1000,
+    'tax_free'          => 0,
+    'order_name'        => '테스트 상품',
+    'order_id'          => 'order_' . time(),
+    'cash_receipt_type' => '소득공제',
+    'identity_no'       => '01012345678'
+));
+```
+
+검증은 offline wire 스위트(`tests/pg/PgHttpWireTest.php`)에 붙였다 — echo 서버로 실제 curl 바디를 받아
+`pg` 생략시 `"pg": null`, 명시시 지정한 값이 나가는지 본다.
+
+### 2.9.0
+
+Ruby SDK parity — 알림톡 v1 API 35종 (`8f1ee1e`). **기존 메서드·파라미터 제거 없음.**
+
+`/v1/alimtalk` 계열을 7개 모듈로 나눠 붙였다. Ruby 의 concern 파일 구성을 그대로 따랐다.
+
+| 모듈 | 메서드 | 엔드포인트 |
+| --- | --- | --- |
+| `alimtalkSender` | `categories` `otp` `create` `getList` `detail` `release` `variableExamples` | `/v1/alimtalk/categories` · `/v1/alimtalk/senders*` |
+| `alimtalkTemplate` | `getList` `create` `detail` `update` `delete` `register` `inspect` `export` `image` `highlightImage` | `/v1/alimtalk/templates*` |
+| `alimtalkSend` | `send` `sendBulk` `cancel` | `/v1/alimtalk/send*` |
+| `alimtalkMessage` | `getList` `stats` `detail` | `/v1/alimtalk/messages*` |
+| `alimtalkOptout` | `getList` `create` `check` `release` | `/v1/alimtalk/optouts*` |
+| `alimtalkOfficial` | `getList` `recommend` `detail` | `/v1/alimtalk/official*` |
+| `alimtalkWebhook` | `detail` `update` `test` `rotateSecret` `deliveries` | `/v1/alimtalk/webhook*` |
+
+> ⚠️ **발송 계열은 샌드박스가 없다.** `alimtalkSend->send`/`sendBulk` 는 실제로 카카오톡이 나가고 과금되며,
+> `alimtalkSender->otp` 는 관리자폰으로 실제 문자를, `alimtalkSender->create` · `alimtalkTemplate->register`/`inspect` 는
+> 카카오에 실제 등록·검수 요청을 보낸다.
+
+#### 알림톡 계열의 요청 규약 2가지
+
+- **`BOOTPAY-ROLE: user` 고정** — 서버 스코프가 전부 `user:alimtalk_*` 다. 인스턴스 role 이 `manager` 로 바뀌어 있어도 알림톡 호출은 `user` 로 나간다.
+- **`Idempotency-Key` 를 붙이지 않는다** — 알림톡 API 는 이 헤더를 읽지 않는다. invoice/product 처럼 무조건 붙이면
+  서버가 주지 않는 멱등 보장을 SDK 가 주는 것처럼 보인다. 멱등은 발송 payload 의 `ref_id` 로만 성립한다.
+
+#### `fallback` · `enabled` · `register` 의 false 는 잘리지 않는다
+
+`fallback` 은 **미지정(생략)과 `false` 의 의미가 다르다** — 생략하면 프로젝트 기본값을 따르고 `false` 는 명시적으로 끈다.
+`isset()` 기반으로 파라미터를 걸렀다면 `false` 가 통째로 사라져 "껐는데 폴백이 나가는" 조용한 실패가 된다.
+그래서 알림톡 모듈의 파라미터 필터는 `array_key_exists()` + `!== null` 로 본다 (Ruby 의 `.compact` 와 같은 기준).
+같은 이유로 쿼리스트링의 bool 은 `http_build_query` 기본 직렬화(`1`/`''`)가 아니라 `true`/`false` 문자열로 보낸다 (`sync=false`, `include_content=false`).
+
+#### 공통 계층 — `requestRaw()` / `getRaw()` 추가
+
+`GET /v1/alimtalk/templates/export` 는 `format=csv` 일 때 CSV 본문을 돌려준다.
+공용 `request()` 는 응답을 무조건 `json_decode` 하므로 **성공한 요청인데도 `null` 이 돌아와** "통신 실패" 로 오인된다.
+그래서 파싱하지 않는 원문 경로를 따로 뒀다. `export()` 는 `format` 기본값을 `json` 으로 두고(서버 기본은 csv),
+`csv` 를 주면 `{ body: '<원문 문자열>', content_type: '...', status: 200 }` 을 돌려준다.
+
+#### 공통 계층 — multipart 파일 필드명 지정 지원
+
+알림톡 템플릿 이미지는 파일 필드명이 상품의 `images[n]` 이 아니라 **`image`** 다.
+`requestMultipart()` 의 `$files` 배열이 **문자열 키면 그 이름을 필드명으로 그대로** 쓰고, 정수 키는 종전대로 `images[0]`, `images[1]` … 로 인덱싱한다.
+기존 상품 이미지 업로드 호출은 정수 키라 동작이 그대로다.
+
+#### 문서 · 테스트
+
+- README 에 `8. 알림톡` 절 추가 (발신프로필 · 공식 카탈로그 · 자체 템플릿 · 발송 · 발송내역 · 수신거부 · 웹훅).
+- 라이브 스크립트 `tests/commerce/Alimtalk.php` 추가 — 조회 계열만 실행하고 부작용이 있는 호출은 주석으로 남겼다.
+- `tests/commerce/AlimtalkWireFormatTest.php` 신설 (offline 스위트 등록) — 35종 전부의 URL · 헤더 · 바디 규약,
+  `Idempotency-Key` 미부착, `false` 보존, `keyword`→`q` 매핑, csv 원문 분기, `image` 필드명, PSR-4 단독 autoload 검증.
+- `CommerceHttpWireTest` 에 실제 curl wire 검증 4건 추가 (multipart `image` 필드명, csv 원문 응답, json 기본값, `fallback: false` 실전송).
+
 ### 2.8.0
 
 #### `product.list` 의 조회 필터를 서버 실제 계약에 맞춤

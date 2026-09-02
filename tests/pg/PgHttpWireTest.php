@@ -70,6 +70,51 @@ class PgHttpWireTest extends WireEchoTestCase
         $this->assertEquals('Basic ' . base64_encode('ck:sk'), self::echoHeader($res, 'Authorization'));
     }
 
+    /**
+     * Ruby SDK `c716a1f` — request_cash_receipt 의 pg 가 선택 파라미터가 되었다.
+     * 생략하면 payload 에 `pg: null` 이 실려 가맹점 기본 PG 로 발행된다.
+     */
+    public function testRequestCashReceiptOmitsPgAsNull()
+    {
+        BootpayApi::setClientKeyConfiguration('ck', 'sk', 'development');
+
+        $res = BootpayApi::requestCashReceipt(array(
+            'price' => 1000,
+            'tax_free' => 0,
+            'order_name' => '테스트 상품',
+            'order_id' => 'order-1',
+            'cash_receipt_type' => '소득공제',
+            'identity_no' => '01012345678'
+        ));
+
+        $this->assertEquals('POST', $res->method);
+        $this->assertEquals('/v2/request/cash/receipt', $res->uri);
+
+        $body = json_decode($res->raw_body, true);
+        $this->assertArrayHasKey('pg', $body);
+        $this->assertNull($body['pg']);
+        $this->assertEquals('소득공제', $body['cash_receipt_type']);
+        $this->assertEquals('order-1', $body['order_id']);
+    }
+
+    public function testRequestCashReceiptKeepsExplicitPg()
+    {
+        BootpayApi::setClientKeyConfiguration('ck', 'sk', 'development');
+
+        $res = BootpayApi::requestCashReceipt(array(
+            'pg' => 'nicepay',
+            'price' => 1000,
+            'tax_free' => 0,
+            'order_name' => '테스트 상품',
+            'order_id' => 'order-2',
+            'cash_receipt_type' => '소득공제',
+            'identity_no' => '01012345678'
+        ));
+
+        $body = json_decode($res->raw_body, true);
+        $this->assertEquals('nicepay', $body['pg']);
+    }
+
     public function testLegacyCredentialsFetchTokenThenSendBearerAuthorization()
     {
         BootpayApi::setConfiguration('application-id', 'private-key', 'development');

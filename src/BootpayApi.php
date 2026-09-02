@@ -571,10 +571,19 @@ class BootpayApi
 
     /**
      * Request Cash Receipt
+     *
+     * `pg` 는 선택 파라미터다. 생략하면 `pg: null` 로 전송되어 가맹점에 설정된 기본 PG 로 발행된다.
+     * 명시적으로 `null` 을 넘긴 경우도 동일하게 기본 PG 로 처리된다.
+     *
      * @throws \Exception
      */
     public static function requestCashReceipt($params)
     {
+        $params = (array)$params;
+        // Ruby SDK(request_cash_receipt) 와 동일하게 pg 키는 항상 payload 에 실린다.
+        if (!array_key_exists('pg', $params)) {
+            $params['pg'] = null;
+        }
         return self::request(
             'POST',
             'request/cash/receipt',

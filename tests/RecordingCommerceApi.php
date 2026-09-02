@@ -42,6 +42,18 @@ class RecordingCommerceApi extends BootpayCommerceApi
         return $this->nextResponse;
     }
 
+    public function requestRaw($method, $url, $headers = null)
+    {
+        $this->calls[] = array(
+            'type' => 'raw',
+            'method' => $method,
+            'url' => $url,
+            'data' => null,
+            'headers' => $headers === null ? array() : $headers
+        );
+        return $this->nextResponse;
+    }
+
     public function lastCall()
     {
         return end($this->calls);
