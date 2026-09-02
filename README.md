@@ -732,11 +732,12 @@ $bootpay->clearRole();
 
 ## Documentation
 
-[부트페이 개발매뉴얼](https://docs.bootpay.co.kr/next/)을 참조해주세요
+- [부트페이 결제 개발문서](https://developers.bootpay.ai)
+- [부트페이 커머스 개발문서](https://commerce.bootpay.ai)
 
 ## 기술문의
 
-[부트페이 홈페이지](https://www.bootpay.co.kr) 우측 하단 채팅을 통해 기술문의 주세요!
+[부트페이 홈페이지](https://www.bootpay.ai)에서 문의해주세요!
 
 ## License
 
