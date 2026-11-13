@@ -49,10 +49,11 @@ class UserModule
      * 본인인증 데이터 조회
      * @param string $standId 인증 ID
      * @return object
+     * @deprecated userAuthenticate() 를 쓴다 (같은 엔드포인트 GET /v1/users/authenticate/{id}). 호환용으로 남겨 두며 userAuthenticate() 로 위임한다.
      */
     public function authenticationData($standId)
     {
-        return $this->bootpay->get("users/authenticate/{$standId}");
+        return $this->userAuthenticate($standId);
     }
 
     /**
@@ -168,7 +169,7 @@ class UserModule
      * 가입 이메일 인증 대기 상태 조회 (V1 Mall API)
      * GET /v1/users/authenticate/{user_standby_id}
      * 서버는 이 조회에 스코프 검사를 걸지 않는다(기존 계약 유지). role 은 다른 회원 API 와 맞춰 user 로 보낸다.
-     * authenticationData($standId) 와 같은 엔드포인트지만, verification_context·Idempotency-Key 를 실을 수 있는 Mall API 형이다.
+     * authenticationData($standId) 는 이 메서드로 위임하는 호환용 별칭이다 (deprecated).
      * @param string $userStandbyId 가입 대기 ID
      * @param string|null $verificationContext 인증 컨텍스트 (선택, null 이면 전송하지 않는다)
      * @param string|null $idempotencyKey 미지정시 자동 생성
