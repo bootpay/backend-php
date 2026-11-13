@@ -1,5 +1,13 @@
 ### Unreleased
 
+#### 주문 발송 정보 조회·발송처리 추가 (ruby `b762095` parity)
+
+- `order->purchases($orderNumber, $idempotencyKey = null)` — `GET /v1/orders/{order_number}/purchases`.
+  발주(배송) 단위 운송장·택배사·배송추적 상태·이력을 조회한다. 주문번호 기준(order_id 아님).
+- `order->updatePurchases($orderNumber, $purchases, $idempotencyKey = null)` — `PUT /v1/orders/{order_number}/purchases`.
+  본문은 `{purchases: [...]}` 뿐이며 주문번호·멱등키는 싣지 않는다. 경로 주문에 딸리지 않은 `order_purchase_number` 가 섞이면 요청 전체가 `ORDER_PURCHASE_NOT_FOUND` 로 거절된다(한 번에 최대 50건).
+- 두 메서드 모두 `BOOTPAY-ROLE: user` 로 고정하고 `Idempotency-Key`(미지정시 자동 생성)를 싣는다.
+
 #### 가입 이메일 인증 대기 상태 조회 추가 (ruby `eb76d9c` parity)
 
 - `user->userAuthenticate($userStandbyId, $verificationContext = null, $idempotencyKey = null)` —

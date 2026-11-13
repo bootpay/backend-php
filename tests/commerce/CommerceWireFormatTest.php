@@ -423,6 +423,33 @@ class CommerceWireFormatTest extends TestCase
         $this->assertEquals('user', $this->headerValue('BOOTPAY-ROLE'));
     }
 
+    public function testOrderPurchasesSendsUserRoleAndIdempotencyKey()
+    {
+        $this->api->order->purchases('ORD-1');
+        $call = $this->lastCall();
+
+        $this->assertEquals('GET', $call['method']);
+        $this->assertEquals('orders/ORD-1/purchases', $call['url']);
+        $this->assertEquals('user', $this->headerValue('BOOTPAY-ROLE'));
+        $this->assertNotEmpty($this->headerValue('Idempotency-Key'));
+
+        $this->api->order->purchases('ORD-1', 'idem-1');
+        $this->assertEquals('idem-1', $this->headerValue('Idempotency-Key'));
+    }
+
+    public function testOrderUpdatePurchasesSendsPurchasesBodyAndUserRole()
+    {
+        $purchases = array(array('order_purchase_number' => 'P1', 'status' => 4, 'tracking_number' => '123'));
+        $this->api->order->updatePurchases('ORD-1', $purchases, 'idem-2');
+        $call = $this->lastCall();
+
+        $this->assertEquals('PUT', $call['method']);
+        $this->assertEquals('orders/ORD-1/purchases', $call['url']);
+        $this->assertEquals(array('purchases' => $purchases), $call['data']);
+        $this->assertEquals('user', $this->headerValue('BOOTPAY-ROLE'));
+        $this->assertEquals('idem-2', $this->headerValue('Idempotency-Key'));
+    }
+
     // ---------- 9. Invoice ----------
 
     public function testInvoiceListAppliesDefaultsAndNewParams()

@@ -55,6 +55,48 @@ class OrderModule
     }
 
     /**
+     * 발송 정보 조회 — 발주(배송) 단위 운송장·택배사·배송추적 상태·이력
+     * GET /v1/orders/{order_number}/purchases
+     * 주문번호 기준(order_id 아님). BOOTPAY-ROLE 은 user 로 고정한다.
+     * @param string $orderNumber 주문번호
+     * @param string|null $idempotencyKey 멱등키 (미지정시 자동 생성)
+     * @return object
+     */
+    public function purchases($orderNumber, $idempotencyKey = null)
+    {
+        $url = 'orders/' . rawurlencode($orderNumber) . '/purchases';
+        return $this->bootpay->get($url, $this->userHeaders($idempotencyKey));
+    }
+
+    /**
+     * 발송처리 — 발주 단위 상태·운송장 갱신
+     * PUT /v1/orders/{order_number}/purchases
+     * 경로 주문에 딸리지 않은 order_purchase_number 가 섞이면 요청 전체가 ORDER_PURCHASE_NOT_FOUND 로 거절된다.
+     * 한 번에 최대 50건. 주문번호·멱등키는 본문에 싣지 않는다.
+     * @param string $orderNumber 주문번호
+     * @param array $purchases 발주 배열. 각 항목: order_purchase_number(필수), status(필수, int),
+     *                         chosen_product_option_id / delivery_type / delivery_company_code / tracking_number(선택)
+     * @param string|null $idempotencyKey 멱등키 (미지정시 자동 생성)
+     * @return object
+     */
+    public function updatePurchases($orderNumber, $purchases, $idempotencyKey = null)
+    {
+        $url = 'orders/' . rawurlencode($orderNumber) . '/purchases';
+        return $this->bootpay->put($url, array('purchases' => $purchases), $this->userHeaders($idempotencyKey));
+    }
+
+    /**
+     * 발송 정보 요청 헤더 — BOOTPAY-ROLE 은 user 로 고정, Idempotency-Key 는 미지정시 자동 생성
+     */
+    private function userHeaders($idempotencyKey = null)
+    {
+        return array(
+            'Idempotency-Key: ' . ($idempotencyKey ?: BootpayCommerceApi::generateIdempotencyKey()),
+            'BOOTPAY-ROLE: user'
+        );
+    }
+
+    /**
      * 배열 또는 단일 값을 콤마 문자열로 잇는다. 값이 비어 있으면 null 을 돌려 쿼리에서 빠지게 한다.
      */
     private function joinList($value)
