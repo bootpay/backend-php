@@ -1,3 +1,12 @@
+### Unreleased
+
+#### 가입 이메일 인증 대기 상태 조회 추가 (ruby `eb76d9c` parity)
+
+- `user->userAuthenticate($userStandbyId, $verificationContext = null, $idempotencyKey = null)` —
+  `GET /v1/users/authenticate/{user_standby_id}`. `verification_context` 는 선택(null 이면 전송하지 않음).
+  서버는 이 조회에 스코프 검사를 걸지 않으며, 다른 회원 API 와 맞춰 `BOOTPAY-ROLE: user` 와 `Idempotency-Key`(미지정시 자동 생성)를 싣는다.
+- 기존 `authenticationData($standId)` 는 그대로 유지한다.
+
 ### 2.11.1
 
 #### 청구서 생성 `BOOTPAY-ROLE` 을 user 로 고정 (nodejs `40b5d45` parity)

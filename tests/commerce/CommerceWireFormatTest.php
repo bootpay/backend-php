@@ -243,6 +243,21 @@ class CommerceWireFormatTest extends TestCase
         $this->assertEquals('user', $this->headerValue('BOOTPAY-ROLE'));
     }
 
+    public function testUserAuthenticateSendsVerificationContextAndUserRole()
+    {
+        $this->api->user->userAuthenticate('standby-1', 'join', 'idem-1');
+        $call = $this->lastCall();
+
+        $this->assertEquals('GET', $call['method']);
+        $this->assertEquals('users/authenticate/standby-1?verification_context=join', $call['url']);
+        $this->assertEquals('user', $this->headerValue('BOOTPAY-ROLE'));
+        $this->assertEquals('idem-1', $this->headerValue('Idempotency-Key'));
+
+        $this->api->user->userAuthenticate('standby-2');
+        $this->assertEquals('users/authenticate/standby-2', $this->lastCall()['url']);
+        $this->assertNotNull($this->headerValue('Idempotency-Key'));
+    }
+
     // ---------- 6. Product Mall API ----------
 
     public function testProductsAppliesDefaultsAndJwtHeader()

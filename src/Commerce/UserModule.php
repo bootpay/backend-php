@@ -165,6 +165,27 @@ class UserModule
     }
 
     /**
+     * 가입 이메일 인증 대기 상태 조회 (V1 Mall API)
+     * GET /v1/users/authenticate/{user_standby_id}
+     * 서버는 이 조회에 스코프 검사를 걸지 않는다(기존 계약 유지). role 은 다른 회원 API 와 맞춰 user 로 보낸다.
+     * authenticationData($standId) 와 같은 엔드포인트지만, verification_context·Idempotency-Key 를 실을 수 있는 Mall API 형이다.
+     * @param string $userStandbyId 가입 대기 ID
+     * @param string|null $verificationContext 인증 컨텍스트 (선택, null 이면 전송하지 않는다)
+     * @param string|null $idempotencyKey 미지정시 자동 생성
+     * @return object
+     */
+    public function userAuthenticate($userStandbyId, $verificationContext = null, $idempotencyKey = null)
+    {
+        $url = 'users/authenticate/' . rawurlencode($userStandbyId);
+        if ($verificationContext !== null) {
+            $url .= '?' . http_build_query(array('verification_context' => $verificationContext));
+        }
+        $headers = $this->mallHeaders(null, $idempotencyKey);
+        $headers[] = 'BOOTPAY-ROLE: user';
+        return $this->bootpay->get($url, $headers);
+    }
+
+    /**
      * 사용자 목록 조회
      * ⚠️ 회원등급 필터의 서버(v1/users_controller#index) 키는 membership_type 이다.
      *    예전 SDK 가 보내던 member_type 은 서버가 읽지 않아 필터가 조용히 무시됐다 —
